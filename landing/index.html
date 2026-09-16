@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify your medicine — MedSecure PQC</title>
+<meta name="description" content="How to check a medicine package with the official MedSecure PQC app.">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<script>
+/* Runs before anything renders.
+   The scanned QR puts a package token in the URL fragment. Strip it from the
+   address bar and from history immediately, and send it nowhere: this page
+   never verifies a package and never contacts the API.
+   Wrapped in try/catch so that a failure here can never blank the page. */
+(function () {
+  try {
+    if (window.location.hash) {
+      var clean = window.location.pathname + window.location.search;
+      window.history.replaceState(null, "", clean);
+    }
+  } catch (e) { /* history API unavailable; the page still works */ }
+})();
+</script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f5f7fa;
+    --border: #d8dee7;
+    --text: #12181f;
+    --muted: #5a6572;
+    --accent: #0b6b5e;
+    --accent-text: #ffffff;
+    --warn-bg: #fff8e6;
+    --warn-border: #e8cf8a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #10141a;
+      --surface: #1a212a;
+      --border: #2c3643;
+      --text: #eef2f7;
+      --muted: #9aa6b4;
+      --accent: #3fbfa8;
+      --accent-text: #0a1a17;
+      --warn-bg: #2a2416;
+      --warn-border: #5c4f2a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+    line-height: 1.55;
+    font-size: 17px;
+  }
+  .wrap { max-width: 34rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.5rem; }
+  .mark { font-size: .78rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0 0 .4rem; }
+  h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 .35rem; }
+  .bn { font-size: 1.15rem; color: var(--muted); margin: 0; }
+  h2 { font-size: 1.1rem; margin: 2rem 0 .75rem; }
+  ol { padding-left: 1.25rem; margin: 0; }
+  li { margin-bottom: 1rem; }
+  li .en { display: block; }
+  li .bn { display: block; font-size: .97rem; margin-top: .15rem; }
+  .note {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 10px;
+    padding: .9rem 1rem;
+    margin: 1.75rem 0;
+    font-size: .95rem;
+  }
+  .note p { margin: 0 0 .4rem; }
+  .note p:last-child { margin-bottom: 0; }
+  .stores { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0 0; }
+  .store {
+    display: inline-block;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: .7rem 1rem;
+    font-size: .93rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 1rem;
+    font-size: .95rem;
+  }
+  .card p { margin: 0 0 .4rem; }
+  .card p:last-child { margin-bottom: 0; }
+  a { color: var(--accent); }
+  footer {
+    margin-top: 2.5rem; padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    font-size: .86rem; color: var(--muted);
+  }
+  footer p { margin: 0 0 .5rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="mark">MedSecure PQC</p>
+    <h1>Open the official app to check this package</h1>
+    <p class="bn">এই প্যাকেটটি যাচাই করতে অফিশিয়াল অ্যাপটি খুলুন</p>
+  </header>
+
+  <p>
+    You reached this page by scanning with an ordinary camera or QR app.
+    <strong>Checking a package is only possible in the official app.</strong>
+  </p>
+  <p class="bn">
+    আপনি সাধারণ ক্যামেরা বা কিউআর অ্যাপ দিয়ে স্ক্যান করে এই পাতায় এসেছেন।
+    <strong>প্যাকেট যাচাই কেবল অফিশিয়াল অ্যাপেই করা যায়।</strong>
+  </p>
+
+  <h2>What to do / যা করবেন</h2>
+  <ol>
+    <li>
+      <span class="en">Install the official MedSecure PQC app.</span>
+      <span class="bn">অফিশিয়াল MedSecure PQC অ্যাপটি ইনস্টল করুন।</span>
+    </li>
+    <li>
+      <span class="en">Scratch off the silver coating over the QR code on the strip.</span>
+      <span class="bn">স্ট্রিপের কিউআর কোডের উপরের রুপালি আবরণ ঘষে তুলুন।</span>
+    </li>
+    <li>
+      <span class="en">Open the app and scan the code again from inside the app.</span>
+      <span class="bn">অ্যাপটি খুলুন এবং অ্যাপের ভেতর থেকে কোডটি আবার স্ক্যান করুন।</span>
+    </li>
+  </ol>
+
+  <div class="note">
+    <p><strong>This page has not checked anything.</strong> Opening this link does not verify your medicine and changes nothing about the package.</p>
+    <p class="bn"><strong>এই পাতাটি কিছুই যাচাই করেনি।</strong> এই লিংক খোলার মাধ্যমে আপনার ওষুধ যাচাই হয় না।</p>
+  </div>
+
+  <h2>Get the app / অ্যাপটি নিন</h2>
+  <div class="stores">
+    <span class="store">Google Play — coming soon / শীঘ্রই আসছে</span>
+    <span class="store">App Store — coming soon / শীঘ্রই আসছে</span>
+  </div>
+
+  <h2>If the code will not scan / কোড স্ক্যান না হলে</h2>
+  <div class="card">
+    <p>Clean the surface, avoid glare, and hold the phone steady about 10&nbsp;cm away. If it still will not scan, report it in the app using the printed reference number on the strip.</p>
+    <p class="bn">পৃষ্ঠটি পরিষ্কার করুন, আলোর প্রতিফলন এড়ান এবং ফোনটি প্রায় ১০ সেন্টিমিটার দূরে স্থির রাখুন। তারপরও না হলে স্ট্রিপে ছাপানো রেফারেন্স নম্বর দিয়ে অ্যাপে রিপোর্ট করুন।</p>
+  </div>
+
+  <h2>Help / সহায়তা</h2>
+  <div class="card">
+    <p>Contact details to be published before the pilot.</p>
+    <p class="bn">পাইলট শুরুর আগে যোগাযোগের তথ্য প্রকাশ করা হবে।</p>
+  </div>
+
+  <footer>
+    <p>
+      This service checks a package's digital record. It does not test the
+      contents of the medicine, and it is not proof of a sale.
+    </p>
+    <p class="bn">
+      এই সেবা প্যাকেটের ডিজিটাল রেকর্ড যাচাই করে। এটি ওষুধের উপাদান পরীক্ষা করে না।
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

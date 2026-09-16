@@ -1,0 +1,36 @@
+# Development dependencies only. The application itself runs on the host during
+# development; see docs/12 for the deployed topology.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: acm_postgres
+    # The race acceptance test fires 100 concurrent confirmations, each on its
+    # own connection; the default limit of 100 is not enough headroom.
+    command: postgres -c max_connections=300
+    environment:
+      POSTGRES_USER: acm
+      POSTGRES_PASSWORD: acm_dev_only
+      POSTGRES_DB: acm
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U acm -d acm"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - acm_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: acm_redis
+    ports:
+      - "56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  acm_pgdata:
