@@ -1,0 +1,8 @@
+{
+  "name": "duplicate-json-key",
+  "description": "Payload repeats a JSON key; parsing must refuse it.",
+  "check": "parse",
+  "payload": "eyJzY2hlbWEiOiJtZWRpY2luZS1hY3RpdmF0aW9uLXYxIiwic2NoZW1hIjoib3RoZXIifQ==",
+  "expected": "INVALID",
+  "reason": "duplicate keys make the record ambiguous"
+}
