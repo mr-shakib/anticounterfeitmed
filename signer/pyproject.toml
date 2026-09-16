@@ -1,0 +1,13 @@
+[project]
+name = "medsigner"
+version = "0.1.0"
+description = "Isolated ML-DSA signing service for the medicine verification platform."
+requires-python = ">=3.12"
+dependencies = ["medcrypto"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["medsigner*"]

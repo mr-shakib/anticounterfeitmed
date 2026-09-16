@@ -35,7 +35,12 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | `crypto-vectors/` | 9 golden vectors, passing in Python and cross-checked against the system OpenSSL binary |
 | Backend data model | All 9 apps, migrations applied to PostgreSQL 17 |
 | Confirm transaction | Built, with fixed lock order and post-lock idempotency recheck |
-| Test suite | 36 tests passing against real PostgreSQL |
+| Serialization + manufacturing records | Built — token generation, print jobs, ordered step recording, QC rejection voids |
+| Signing service (`medsigner`) | Built — isolated package, holds seeds, signs opaque bytes; in-process signing refused outside DEBUG |
+| Activation + trust manifest | Built — per-unit signed credentials, honest partial-failure reporting, retry-failures-only, versioned root-signed manifest |
+| Prepare (preview) | Built — issues challenges, never redeems |
+| End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
+| Test suite | 60 tests passing against real PostgreSQL |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |
 | Spike S2 (sign/verify) | Server side **done**; Dart side **not started** |
 | Spike S3 (one redemption) | **Done** — 100 concurrent attempts yield exactly one first redemption, stable over repeated runs |

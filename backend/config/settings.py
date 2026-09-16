@@ -127,7 +127,17 @@ TRUST_MANIFEST_CACHE_SECONDS = int(env("TRUST_MANIFEST_CACHE_SECONDS", str(24 * 
 # In development the backend may sign in-process. Staging and pilot must point
 # at the isolated signer, which is the only component holding private keys.
 SIGNER_MODE = env("SIGNER_MODE", "local")  # "local" | "service"
+
+# In-process signing is refused outside DEBUG. The test suite sets this
+# explicitly; nothing else should. It exists so the DEBUG guard stays strict
+# rather than being loosened to accommodate tests.
+SIGNER_ALLOW_INSECURE_LOCAL = env_bool("SIGNER_ALLOW_INSECURE_LOCAL", False)
 SIGNER_URL = os.environ.get("SIGNER_URL", "")
+
+# Development keystore. Real deployments populate the signing service's own
+# store from a secret manager; the backend never reads this path in "service"
+# mode and never holds key material itself.
+SIGNER_KEYSTORE_PATH = env("SIGNER_KEYSTORE_PATH", str(BASE_DIR.parent / ".keys"))
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://127.0.0.1:56379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL

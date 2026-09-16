@@ -7,9 +7,9 @@ Source: SRS §9. **Do not advance past a gate with an unresolved failure in the 
 | # | Milestone | Work | Completion gate |
 | --- | --- | --- | --- |
 | 1 | Freeze protocol + spikes | Agree unit size, token URL, lifecycle, role permissions, record schema; test QR fragments on real cameras; sign on server, verify on one Android device | Same signed bytes verify across server/mobile; invalid bytes fail; printed URL opens correct website |
-| 2 | Backend foundation | Organizations, MFA staff access, product/batch tables, object permissions, unit constraints, audit events | **Manufacturer A cannot access or activate manufacturer B's units** |
-| 3 | Manufacturer readiness records | Generate/export labels; record off-system printing/QC/coating; reject/replace codes; reconcile quantities | Manufacturer can record required evidence and activate eligible units **without a factory end** |
-| 4 | Activation and trust | Signing component, signed credentials, trust manifest, issuer binding, per-unit bulk job results | Tampered data, wrong keys, and failed signing **never** produce active eligible units |
+| 2 ✅ | Backend foundation | Organizations, MFA staff access, product/batch tables, object permissions, unit constraints, audit events | **Manufacturer A cannot access or activate manufacturer B's units** |
+| 3 ✅ | Manufacturer readiness records | Generate/export labels; record off-system printing/QC/coating; reject/replace codes; reconcile quantities | Manufacturer can record required evidence and activate eligible units **without a factory end** |
+| 4 ✅ | Activation and trust | Signing component, signed credentials, trust manifest, issuer binding, per-unit bulk job results | Tampered data, wrong keys, and failed signing **never** produce active eligible units |
 | 5 | Consumer flow | Flutter scan/preview/confirm/result/history/report; anonymous sessions; attestation; signed statuses and receipts | Browser visits do nothing to unit state; genuine app completes one valid verification |
 | 6 | Failure handling | Transactions, concurrency, outbox, retries, pending receipts, recall and suspension checks | One first redemption under contention; retry and signer-failure recovery preserve the same event |
 | 7 | Physical + operational pilot | Print/scratch tests, representative phones, API load measurements, alert/case review, backup restoration | Doc 11 acceptance tests pass; issues and measured results recorded |

@@ -19,6 +19,18 @@ from apps.verification.models import ConsumerSession, VerificationChallenge
 from medcrypto import generate_token, hash_token
 
 
+@pytest.fixture(autouse=True)
+def _allow_local_signer(settings, tmp_path_factory):
+    """Let tests sign in-process, with their own throwaway keystore.
+
+    The production guard refuses in-process signing outside DEBUG, and pytest
+    runs with DEBUG off. Rather than weakening that guard, tests opt in
+    explicitly and keep their key material in a temporary directory.
+    """
+    settings.SIGNER_ALLOW_INSECURE_LOCAL = True
+    settings.SIGNER_KEYSTORE_PATH = str(tmp_path_factory.mktemp("keys"))
+
+
 @pytest.fixture
 def manufacturer(db):
     return Organization.objects.create(

@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.db import IntegrityError, transaction
@@ -251,4 +251,128 @@ def confirm_verification(
         operation=operation,
         event=event,
         first_redemption=event_type == VerificationEventType.FIRST_REDEMPTION,
+    )
+
+
+# --- preview -----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PrepareResult:
+    """What the app needs to display a package and offer confirmation.
+
+    ``credential_bytes`` and ``credential_signature`` are the exact bytes the
+    manufacturer signed. The app verifies them itself before displaying
+    anything; this preview never redeems.
+    """
+
+    outcome: str
+    unit: PackageUnit | None
+    restrictions: list[str]
+    credential_bytes: bytes | None
+    credential_signature: bytes | None
+    credential_key_id: str | None
+    challenge: VerificationChallenge | None
+
+
+def prepare_verification(
+    *,
+    session: ConsumerSession,
+    token: str,
+    now: datetime | None = None,
+) -> PrepareResult:
+    """Look up a scanned token and, when eligible, issue a challenge.
+
+    An unknown token is answered with a normal outcome rather than an error, so
+    the app can verify a signed negative answer too. Inactive units expose only
+    limited status.
+    """
+    from django.conf import settings
+
+    from medcrypto.tokens import hash_token, is_well_formed_token
+
+    now = now or timezone.now()
+    empty = PrepareResult(
+        outcome=VerificationOutcome.NOT_FOUND,
+        unit=None,
+        restrictions=[],
+        credential_bytes=None,
+        credential_signature=None,
+        credential_key_id=None,
+        challenge=None,
+    )
+
+    if not is_well_formed_token(token):
+        return empty
+
+    unit = (
+        PackageUnit.objects.select_related("batch__product__manufacturer")
+        .filter(token_sha256=hash_token(token))
+        .first()
+    )
+    if unit is None:
+        return empty
+
+    batch = unit.batch
+    organization = batch.product.manufacturer
+    restrictions = _active_restrictions(organization, batch, unit, now)
+
+    if restrictions:
+        return PrepareResult(
+            outcome=_outcome_for_restrictions(restrictions),
+            unit=unit,
+            restrictions=restrictions,
+            credential_bytes=None,
+            credential_signature=None,
+            credential_key_id=None,
+            challenge=None,
+        )
+
+    if unit.lifecycle not in (UnitLifecycle.ACTIVE, UnitLifecycle.REDEEMED):
+        # Not activated yet: limited status only, and no credential to show.
+        return PrepareResult(
+            outcome=VerificationOutcome.NOT_ACTIVATED,
+            unit=unit,
+            restrictions=[],
+            credential_bytes=None,
+            credential_signature=None,
+            credential_key_id=None,
+            challenge=None,
+        )
+
+    credential = getattr(unit, "activation_credential", None)
+    if credential is None:
+        # An active unit without a credential is a data fault, not a consumer
+        # problem. Decline rather than present an unverifiable package.
+        return PrepareResult(
+            outcome=VerificationOutcome.INVALID_CREDENTIAL,
+            unit=unit,
+            restrictions=[],
+            credential_bytes=None,
+            credential_signature=None,
+            credential_key_id=None,
+            challenge=None,
+        )
+
+    challenge = VerificationChallenge.objects.create(
+        session=session,
+        unit=unit,
+        credential_version=unit.version,
+        expires_at=now + timedelta(seconds=settings.CHALLENGE_TTL_SECONDS),
+    )
+
+    outcome = (
+        VerificationOutcome.PREVIOUSLY_VERIFIED
+        if unit.lifecycle == UnitLifecycle.REDEEMED
+        else VerificationOutcome.VERIFIED_FIRST
+    )
+
+    return PrepareResult(
+        outcome=outcome,
+        unit=unit,
+        restrictions=[],
+        credential_bytes=bytes(credential.canonical_bytes),
+        credential_signature=bytes(credential.signature),
+        credential_key_id=credential.signing_key.key_id,
+        challenge=challenge,
     )
