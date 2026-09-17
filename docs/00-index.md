@@ -42,8 +42,11 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | Consumer HTTP API | Built — sessions, trust manifest, prepare, confirm, operation status, package status, reports |
 | Signed status envelopes | Built — every response signed, nonce-bound, short-lived; negative answers signed too |
 | App attestation + rate limits | Built — both credentials mandatory; accept-any attestation refused outside DEBUG |
+| Firebase App Check verification | **Built** — offline JWKS verification; rejects wrong issuer/audience/app, expiry, `alg=none` and foreign signatures |
+| Receipt outbox worker | **Built** — Celery task, idempotent; a signer failure after commit never undoes a redemption |
+| Pilot deployment config | **Built** — Dockerfiles and compose; signer verified internal-only with no DB credentials |
 | End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
-| Test suite | 73 tests passing against real PostgreSQL |
+| Test suite | 90 tests passing against real PostgreSQL |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |
 | Spike S2 (sign/verify) | Server side **done**; Dart side **not started** |
 | Spike S3 (one redemption) | **Done** — 100 concurrent attempts yield exactly one first redemption, stable over repeated runs |

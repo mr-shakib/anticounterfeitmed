@@ -1,0 +1,99 @@
+# Pilot deployment.
+#
+# The shape that matters here is the network split. Everything the internet can
+# reach sits on "edge"; the signing service sits only on "internal", with no
+# published port and no route in from outside. A compromised web process can ask
+# it for a signature, which is audited, but cannot reach the key material.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 10
+    # Continuous archiving for point-in-time recovery. A restore drill is an
+    # acceptance test, not an optional extra: see docs/11.
+    command: >
+      postgres
+      -c max_connections=300
+      -c wal_level=replica
+      -c archive_mode=on
+      -c archive_command='test ! -f /backups/wal/%f && cp %p /backups/wal/%f'
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [internal]
+
+  signer:
+    build:
+      context: ..
+      dockerfile: signer/Dockerfile
+    restart: unless-stopped
+    # No ports. No database credentials. Internal network only.
+    networks: [internal]
+    volumes:
+      - ${SIGNER_KEYS_HOST_PATH:-./keys}:/keys:ro
+    environment:
+      SIGNER_KEYSTORE_PATH: /keys
+
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [internal, edge]
+    expose: ["8000"]
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [internal]
+    command: celery -A config worker -l info
+
+  beat:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [internal]
+    command: celery -A config beat -l info
+
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on: [api]
+    networks: [edge]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ../landing:/srv/landing:ro
+      - ./certs:/etc/letsencrypt:ro
+
+volumes:
+  pgdata:
+
+networks:
+  edge:
+  internal:
+    internal: true

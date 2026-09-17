@@ -39,30 +39,98 @@ class AcceptAnyVerifier:
 
 
 class FirebaseAppCheckVerifier:
-    """Verifies a Firebase App Check JWT against Google's public keys.
+    """Verifies a Firebase App Check token on our own backend.
 
-    The token is a JWT signed by Google. Verification checks the signature
-    against the JWKS, the issuer, the audience (the Firebase project), expiry,
-    and that the subject is one of the app ids we published.
+    The token is a JWT signed by Google. Verification is offline against the
+    cached JWKS, so a scan costs no round trip to Google and adds nothing to the
+    latency budget.
+
+    Checks performed, per Firebase's custom-backend guidance:
+
+    * header ``alg`` is RS256 and ``typ`` is JWT;
+    * signature verifies against the JWKS key named by ``kid``;
+    * ``iss`` is ``https://firebaseappcheck.googleapis.com/<project_number>``;
+    * ``aud`` contains ``projects/<project_number>``;
+    * ``exp`` has not passed;
+    * ``sub`` is one of the app ids we published.
+
+    The ``sub`` check is optional in Firebase's documentation. It is mandatory
+    here: without it any App Check token from any app in the project would be
+    accepted, which is not the control we want.
     """
 
     JWKS_URL = "https://firebaseappcheck.googleapis.com/v1/jwks"
+    ALGORITHM = "RS256"
+    LEEWAY_SECONDS = 30
 
-    def __init__(self, project_number: str, allowed_app_ids: list[str]) -> None:
+    def __init__(
+        self,
+        project_number: str,
+        allowed_app_ids: list[str],
+        jwks_client=None,
+    ) -> None:
         if not project_number or not allowed_app_ids:
             raise ImproperlyConfigured(
                 "APP_CHECK_PROJECT_NUMBER and APP_CHECK_ALLOWED_APP_IDS are "
                 "required when APP_CHECK_MODE=firebase"
             )
-        self.project_number = project_number
-        self.allowed_app_ids = allowed_app_ids
+        self.project_number = str(project_number)
+        self.allowed_app_ids = set(allowed_app_ids)
+        self._jwks_client = jwks_client
+
+    @property
+    def issuer(self) -> str:
+        return f"https://firebaseappcheck.googleapis.com/{self.project_number}"
+
+    @property
+    def audience(self) -> str:
+        return f"projects/{self.project_number}"
+
+    def _client(self):
+        # Built lazily and cached on the instance: PyJWKClient caches fetched
+        # keys, so key rotation is picked up without a request per scan.
+        if self._jwks_client is None:
+            from jwt import PyJWKClient
+
+            self._jwks_client = PyJWKClient(self.JWKS_URL, cache_keys=True)
+        return self._jwks_client
 
     def verify(self, token: str) -> str:
-        raise NotImplementedError(
-            "Firebase App Check verification is not wired up yet. It needs a "
-            "real Firebase project and Play Integrity configuration (decision "
-            "D9) before it can be implemented and tested against anything real."
-        )
+        import jwt
+
+        if not token:
+            raise AttestationFailed("missing attestation token")
+
+        try:
+            header = jwt.get_unverified_header(token)
+        except jwt.PyJWTError as exc:
+            raise AttestationFailed(f"malformed attestation token: {exc}") from exc
+
+        if header.get("alg") != self.ALGORITHM:
+            raise AttestationFailed(f"unexpected algorithm {header.get('alg')!r}")
+        if header.get("typ") not in ("JWT", "jwt"):
+            raise AttestationFailed(f"unexpected token type {header.get('typ')!r}")
+
+        try:
+            signing_key = self._client().get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[self.ALGORITHM],
+                issuer=self.issuer,
+                audience=self.audience,
+                leeway=self.LEEWAY_SECONDS,
+                options={"require": ["exp", "iss", "aud", "sub"]},
+            )
+        except jwt.PyJWTError as exc:
+            raise AttestationFailed(f"attestation token rejected: {exc}") from exc
+        except Exception as exc:  # JWKS fetch failures surface here
+            raise AttestationFailed(f"could not verify attestation: {exc}") from exc
+
+        app_id = claims.get("sub", "")
+        if app_id not in self.allowed_app_ids:
+            raise AttestationFailed("attestation token is for an unknown app")
+        return app_id
 
 
 def get_attestation_verifier() -> AttestationVerifier:

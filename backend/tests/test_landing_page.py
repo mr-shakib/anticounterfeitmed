@@ -115,6 +115,21 @@ def test_root_is_served_directly_without_redirect():
     assert "try_files" in body
 
 
-def test_no_verification_api_exposed_from_landing_origin():
+def test_api_is_proxied_not_served_from_the_landing_root():
+    """The API shares the origin; the page still cannot reach it.
+
+    A path rule would add nothing here. What stops the landing page calling the
+    API is its own CSP, which forbids every outbound connection, and that is
+    asserted separately above.
+    """
     conf = NGINX.read_text()
-    assert "location /v1/" in conf and "return 404" in conf
+    assert "location /v1/" in conf
+    assert "proxy_pass" in conf
+    # The landing root must not fall through to the API.
+    assert "root /srv/landing;" in conf
+
+
+def test_plain_http_is_redirected_to_https():
+    conf = NGINX.read_text()
+    assert "listen 80;" in conf
+    assert "return 301 https://" in conf
