@@ -111,10 +111,41 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    # Endpoints declare their own authentication explicitly. There is no global
+    # default, so a new view cannot inherit consumer authority by accident.
     "DEFAULT_AUTHENTICATION_CLASSES": [],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "UNAUTHENTICATED_USER": None,
+    "DEFAULT_THROTTLE_RATES": {
+        # Pilot starting values (docs/05). Tune against real networks.
+        "consumer_prepare": env("RATE_LIMIT_PREPARE", "30/min"),
+        "consumer_confirm": env("RATE_LIMIT_CONFIRM", "10/min"),
+    },
 }
+
+# Throttling needs a shared cache in a deployed environment; per-process memory
+# would let each worker grant its own allowance.
+CACHES = {
+    "default": (
+        {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": env("REDIS_CACHE_URL", "redis://127.0.0.1:56379/1"),
+        }
+        if env_bool("USE_REDIS_CACHE", False)
+        else {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "acm-local",
+        }
+    )
+}
+
+# --- app attestation --------------------------------------------------------
+APP_CHECK_MODE = env("APP_CHECK_MODE", "accept-any")  # "accept-any" | "firebase"
+APP_CHECK_ALLOW_INSECURE = env_bool("APP_CHECK_ALLOW_INSECURE", False)
+APP_CHECK_PROJECT_NUMBER = os.environ.get("APP_CHECK_PROJECT_NUMBER", "")
+APP_CHECK_ALLOWED_APP_IDS = [
+    a for a in os.environ.get("APP_CHECK_ALLOWED_APP_IDS", "").split(",") if a
+]
 
 # --- verification policy (docs/05 pilot starting values) -------------------
 # These are pilot settings to be tuned against real network measurements, not

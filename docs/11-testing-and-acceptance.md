@@ -76,6 +76,20 @@ Report **p50/p95** with phone models, server configuration, library versions, ne
 
 **Starting service target: p95 under 2 seconds from confirmation tap to verified receipt at 20 confirmation requests/second, on a documented test network. Measure it — do not promise it before testing.**
 
+### First response-size measurements (2026-09-17, local HTTP)
+
+Taken against the real server, not estimated. Base64 inflates the signatures by roughly a third.
+
+| Endpoint | Response bytes |
+| --- | --- |
+| `prepare` | **~11.0 KB** |
+| `confirm` | ~5.5 KB |
+| `GET /v1/trust/manifest` | ~11.1 KB (3 keys) |
+
+`prepare` carries two ML-DSA-65 signatures (activation credential and status envelope) plus the credential itself, and dominates the flow. This matters on the networks the pilot targets: on a slow mobile connection, 11 KB is the difference between a scan that feels instant and one that does not. Two levers exist if it proves too slow — benchmark ML-DSA-44, whose signatures are smaller (decision D6), and return the signatures as raw bytes rather than base64. Measure before changing anything.
+
+The trust manifest grows with every key, so its size should be re-measured once a realistic number of manufacturers exist.
+
 ### PQC comparison (for the research output)
 
 Run the same canonical record and workflow with:
