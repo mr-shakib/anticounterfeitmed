@@ -2,7 +2,7 @@
 PY := .venv/bin/python
 COMPOSE := docker compose -f infra/docker-compose.dev.yml
 
-.PHONY: help up down migrate test vectors vectors-regen crosscheck leakcheck landing-csp labels check
+.PHONY: help up down migrate test vectors vectors-regen crosscheck leakcheck landing-csp labels serve operator seed check
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +32,15 @@ crosscheck:  ## Verify the vectors with the system OpenSSL binary
 
 leakcheck:  ## Fail if anything that looks like a raw token is committed
 	./scripts/check_no_token_leak.sh
+
+serve:  ## Run the dev server at http://127.0.0.1:8000 (admin at /admin/)
+	DJANGO_DEBUG=1 $(PY) backend/manage.py runserver 127.0.0.1:8000
+
+operator:  ## Create the local platform-operator admin account
+	DJANGO_DEBUG=1 $(PY) backend/manage.py createsuperuser
+
+seed:  ## Seed a demo manufacturer, batch and activated units
+	DJANGO_DEBUG=1 $(PY) backend/manage.py seed_demo --count 3
 
 landing-csp:  ## Recompute the landing page CSP hashes into landing/nginx.conf
 	$(PY) scripts/build_landing_csp.py
