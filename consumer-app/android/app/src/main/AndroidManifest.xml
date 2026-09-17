@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Scanning only. Location is never requested: ordinary verification does
+         not need it, and asking would collect something we must not hold. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="consumer_app"
         android:name="${applicationName}"
