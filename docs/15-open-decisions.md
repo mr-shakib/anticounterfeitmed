@@ -26,7 +26,7 @@ Update the Status column as answers arrive; record the answer and the date.
 
 | # | Decision | Why it matters | Status |
 | --- | --- | --- | --- |
-| D9 | **Google Play Console account and Play Integrity setup.** | Needed for App Check attestation and store test distribution. Long calendar lead time — **start in week 1**. | **Open** |
+| D9 | **Google Play Console account and Play Integrity setup.** | Needed for attestation and store test distribution. **Register as an organization, not a personal account.** Personal accounts created after 13 Nov 2023 must run a closed test with 12 testers opted in continuously for 14 days before production access; organization accounts are exempt. As a university project an organization account should be available, and it removes a hard two-week gate plus the need to recruit 12 testers. Cost is $25 one time either way. **Start in week 1** — verification of an organization account itself takes time. | **Open** |
 | D10 | **Bangla translation source.** | Result strings carry clinical-safety meaning. The distinction between "the code matches" and "the medicine is genuine" must survive translation. Needs a native speaker with pharmaceutical context, not machine translation. | **Open** |
 | D11 | **Which 3 phone models represent the pilot?** | Fixes the physical QR test matrix and performance targets. Should reflect what patients in the pilot region actually carry, not flagships. | **Open** |
 
