@@ -48,9 +48,10 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
 | Test suite | 90 tests passing against real PostgreSQL |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |
-| Spike S2 (sign/verify) | Server side **done**; Dart side **not started** |
+| Spike S2 (sign/verify) | **PASSED** — pure Dart, no FFI; 9/9 vectors agree on Android; 2.5 ms per verify |
 | Spike S3 (one redemption) | **Done** — 100 concurrent attempts yield exactly one first redemption, stable over repeated runs |
-| Staff portal, landing, Flutter app | Not started |
+| Dart verifier + on-device self-check | **Built** — `consumer-app/lib/crypto/`, 6 Flutter tests |
+| Staff portal, Flutter consumer screens | Not started |
 
 ### Already verified on this machine (2026-09-16)
 

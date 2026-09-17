@@ -32,7 +32,7 @@ A compliant replacement page (`landing/`) and its nginx configuration now exist,
 
 ---
 
-## S2 — Sign on server, verify on device  🟨 SERVER SIDE DONE, DART SIDE OPEN *(top risk)*
+## S2 — Sign on server, verify on device  ✅ PASSED *(risk retired)*
 
 **Risk:** ML-DSA verification inside Flutter on Android ARM64 is unproven. Everything else in the crypto design depends on it.
 
@@ -58,7 +58,26 @@ rfc8785 (JCS) available on PyPI
 
 **Gate (SRS milestone 1):** the same signed bytes verify on server **and** mobile; **every** negative vector fails on both; verification time is acceptable on the slowest phone.
 
-**If both Dart options fail**, escalate before proceeding — options then are a platform-channel native verifier (Kotlin/Swift) or, as a last resort, reduced client-side verification, which weakens the security story and must be an owner decision.
+**Result (2026-09-17): PASSED, with the better of the two possible outcomes.**
+
+Pure Dart works. The `pqcrypto` package implements FIPS 204 including the context-string parameter, so option 1 (FFI to a bundled `libcrypto`) was not needed. That removes a whole class of work and risk: no native build, no `.so` per ABI, no APK size penalty, and **ARM64 needs no separate porting effort**, because there is no native code to port.
+
+All 9 golden vectors reach the same verdict in Dart as in Python and under the OpenSSL CLI. Three independent implementations now agree, including context separation, truncated and empty signatures, duplicate JSON keys, and a genuine credential presented against the wrong token.
+
+| Measurement | Value |
+| --- | --- |
+| Verify, Dart AOT on x86-64 desktop | ~1.9 ms p50 |
+| Verify, Flutter release build on Android | **2.5 ms p50** |
+| Two signatures per scan (credential + status) | **~5 ms** |
+| Release APK | 17 MB, no native crypto bundled |
+
+Five milliseconds is far below perception and irrelevant against the two-second service target. A budget phone an order of magnitude slower stays imperceptible.
+
+Evidence: `docs/evidence/s2-android-selfcheck.png`.
+
+**Still unproven: real ARM64 hardware.** The run used the Pixel 7 emulator, which is **x86_64**, so it demonstrates the Flutter and Android runtime path but not the target ABI or real-device timing. With no native code the ABI risk is low — but low is not measured. Closing it needs one pilot phone over USB, which ties to decision D11. The test to run there is `consumer-app/lib/crypto/self_check.dart`, which reports on the device itself.
+
+**If a future change breaks this**, escalate before proceeding — the options then are a platform-channel native verifier (Kotlin/Swift) or, as a last resort, reduced client-side verification, which weakens the security story and must be an owner decision.
 
 ---
 
