@@ -48,5 +48,20 @@ landing-csp:  ## Recompute the landing page CSP hashes into landing/nginx.conf
 labels:  ## Generate the printable physical QR test sheet (80 labels)
 	$(PY) spikes/s1-qr/generate_test_labels.py
 
+operator:  ## Create the local platform-operator admin account
+	DJANGO_DEBUG=1 $(PY) backend/manage.py createsuperuser
+
+seed:  ## Seed demo data (development only)
+	DJANGO_DEBUG=1 $(PY) backend/manage.py seed_demo --count 3
+
+serve:  ## Run the backend, admin at http://127.0.0.1:8000/admin/
+	DJANGO_DEBUG=1 $(PY) backend/manage.py runserver 127.0.0.1:8000
+
+apk:  ## Build the Android self-check APK into dist/
+	cd consumer-app && flutter build apk --release --target-platform=android-arm64
+	mkdir -p dist
+	cp consumer-app/build/app/outputs/flutter-apk/app-release.apk dist/medsecure-selfcheck-arm64.apk
+	@sha256sum dist/medsecure-selfcheck-arm64.apk
+
 check: test vectors crosscheck leakcheck  ## Everything CI runs
 	@echo "all checks passed"
