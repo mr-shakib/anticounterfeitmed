@@ -1,0 +1,10 @@
+name: s2_dart_verify
+description: Spike S2 - verify the golden ML-DSA vectors in Dart.
+publish_to: none
+environment:
+  sdk: ^3.5.0
+dependencies:
+  pqcrypto: ^0.4.1
+  crypto: ^3.0.0
+dev_dependencies:
+  test: ^1.25.0

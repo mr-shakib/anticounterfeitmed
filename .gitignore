@@ -19,3 +19,10 @@ spikes/**/out/
 *.egg-info/
 *.egg-info
 .keys/
+# Flutter
+consumer-app/build/
+consumer-app/.dart_tool/
+consumer-app/android/.gradle/
+consumer-app/android/local.properties
+spikes/s2-dart/.dart_tool/
+**/.flutter-plugins-dependencies
