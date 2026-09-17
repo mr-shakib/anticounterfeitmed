@@ -34,6 +34,21 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or (
 
 ALLOWED_HOSTS = [h for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
+# Django checks the Origin header on cookie-authenticated writes. In production
+# the portal and the API share an origin behind nginx, so the check passes on
+# its own. In development they run on different ports, so the portal's origin
+# has to be named here -- otherwise every staff write fails CSRF with a message
+# that reads like a permissions problem.
+CSRF_TRUSTED_ORIGINS = [
+    o for o in env(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100"
+        if DEBUG
+        else "",
+    ).split(",")
+    if o
+]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

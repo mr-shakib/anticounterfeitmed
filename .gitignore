@@ -28,3 +28,6 @@ spikes/s2-dart/.dart_tool/
 **/.flutter-plugins-dependencies
 consumer-app/android/.kotlin/
 dist/
+staff-web/node_modules/
+staff-web/.next/
+staff-web/out/

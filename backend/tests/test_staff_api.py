@@ -473,3 +473,18 @@ def test_reads_are_not_blocked_by_csrf(make_manufacturer):
     response = strict.get(reverse("staff-me"))
     assert response.status_code in (200, 403)
     assert "CSRF" not in str(response.data.get("detail", ""))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_portal_origin_is_trusted_for_csrf(settings):
+    """The portal's origin must be named, or every staff write fails CSRF.
+
+    Django checks the Origin header on cookie-authenticated writes. Behind nginx
+    the portal and API share an origin and this passes on its own, but a
+    separately-served portal needs naming -- and the failure reads like a
+    permissions problem, not a configuration one.
+    """
+    assert settings.CSRF_TRUSTED_ORIGINS, "no trusted origins configured"
+    assert any("3000" in o or "3100" in o for o in settings.CSRF_TRUSTED_ORIGINS), (
+        "the development portal origin is not trusted"
+    )

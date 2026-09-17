@@ -49,12 +49,13 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | Receipt outbox worker | **Built** — Celery task, idempotent; a signer failure after commit never undoes a redemption |
 | Pilot deployment config | **Built** — Dockerfiles and compose; signer verified internal-only with no DB credentials |
 | End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
-| Test suite | 131 tests passing against real PostgreSQL |
+| Test suite | 132 tests passing against real PostgreSQL |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |
 | Spike S2 (sign/verify) | **PASSED** — pure Dart, no FFI; 9/9 vectors agree on Android; 2.5 ms per verify |
 | Spike S3 (one redemption) | **Done** — 100 concurrent attempts yield exactly one first redemption, stable over repeated runs |
 | Dart verifier + on-device self-check | **Built** — `consumer-app/lib/crypto/`, 6 Flutter tests |
-| Staff portal, Flutter consumer screens | Not started |
+| **Staff portal (Next.js)** | **Built** — login with TOTP, manufacturer workspace (products, batches, labels, manufacturing, activation, recall), admin workspace (organizations, investigations, audit) |
+| Flutter consumer screens | Not started |
 
 ### Already verified on this machine (2026-09-16)
 
