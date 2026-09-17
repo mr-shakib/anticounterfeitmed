@@ -6,14 +6,29 @@ Source: SRS §9. **Do not advance past a gate with an unresolved failure in the 
 
 | # | Milestone | Work | Completion gate |
 | --- | --- | --- | --- |
-| 1 | Freeze protocol + spikes | Agree unit size, token URL, lifecycle, role permissions, record schema; test QR fragments on real cameras; sign on server, verify on one Android device | Same signed bytes verify across server/mobile; invalid bytes fail; printed URL opens correct website |
+| 1 🟨 | Freeze protocol + spikes | Agree unit size, token URL, lifecycle, role permissions, record schema; test QR fragments on real cameras; sign on server, verify on one Android device | Same signed bytes verify across server/mobile; invalid bytes fail; printed URL opens correct website |
 | 2 ✅ | Backend foundation | Organizations, MFA staff access, product/batch tables, object permissions, unit constraints, audit events | **Manufacturer A cannot access or activate manufacturer B's units** |
 | 3 ✅ | Manufacturer readiness records | Generate/export labels; record off-system printing/QC/coating; reject/replace codes; reconcile quantities | Manufacturer can record required evidence and activate eligible units **without a factory end** |
 | 4 ✅ | Activation and trust | Signing component, signed credentials, trust manifest, issuer binding, per-unit bulk job results | Tampered data, wrong keys, and failed signing **never** produce active eligible units |
-| 5 | Consumer flow | Flutter scan/preview/confirm/result/history/report; anonymous sessions; attestation; signed statuses and receipts | Browser visits do nothing to unit state; genuine app completes one valid verification |
-| 6 | Failure handling | Transactions, concurrency, outbox, retries, pending receipts, recall and suspension checks | One first redemption under contention; retry and signer-failure recovery preserve the same event |
+| 5 🟨 | Consumer flow | Flutter scan/preview/confirm/result/history/report; anonymous sessions; attestation; signed statuses and receipts | Browser visits do nothing to unit state; genuine app completes one valid verification |
+| 6 ✅ | Failure handling | Transactions, concurrency, outbox, retries, pending receipts, recall and suspension checks | One first redemption under contention; retry and signer-failure recovery preserve the same event |
 | 7 | Physical + operational pilot | Print/scratch tests, representative phones, API load measurements, alert/case review, backup restoration | Doc 11 acceptance tests pass; issues and measured results recorded |
 | 8 | Further PQC / AI experiments | Hybrid TLS measurements; then labeled OCR mismatch experiment | Negotiated algorithms evidenced; AI performance evaluated against ground truth |
+
+### Status as of 2026-09-17
+
+| Milestone | State |
+| --- | --- |
+| 1 Freeze protocol + spikes | 🟨 S3 passed; S2 server side done, Dart side open; S1 materials ready, phone test not run |
+| 2 Backend foundation | ✅ |
+| 3 Manufacturer readiness records | ✅ |
+| 4 Activation and trust | ✅ |
+| 5 Consumer flow | 🟨 backend complete (API, sessions, attestation, signed envelopes); Flutter app not started |
+| 6 Failure handling | ✅ gates met — one redemption under contention, retries, outbox, signer-failure recovery, recall ordering |
+| 7 Physical + operational pilot | ⬜ not started; needs printed labels and phones |
+| 8 Further PQC / AI | ⬜ later |
+
+**The backend is feature-complete for the first release.** What remains is the two clients, the physical validation, and the decisions in doc 15.
 
 **Deferred backlog, outside these milestones:** the printing/QC end and the pharmacy end. Neither is a first-release dependency. Develop either only when it is formally brought into scope.
 
