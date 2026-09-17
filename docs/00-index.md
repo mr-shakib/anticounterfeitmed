@@ -40,13 +40,16 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | Activation + trust manifest | Built — per-unit signed credentials, honest partial-failure reporting, retry-failures-only, versioned root-signed manifest |
 | Prepare (preview) | Built — issues challenges, never redeems |
 | Consumer HTTP API | Built — sessions, trust manifest, prepare, confirm, operation status, package status, reports |
+| Staff HTTP API | **Built** — login, TOTP second factor, catalog, batches, print jobs + label export, manufacturing records, activation, recall, unit blocking |
+| Platform admin API | **Built** — approvals, suspension, audit search, investigation queue, operational dashboard |
+| Django admin (interim operator UI) | Built — read-only over signed history, 21 invariant tests |
 | Signed status envelopes | Built — every response signed, nonce-bound, short-lived; negative answers signed too |
 | App attestation + rate limits | Built — both credentials mandatory; accept-any attestation refused outside DEBUG |
 | Firebase App Check verification | **Built** — offline JWKS verification; rejects wrong issuer/audience/app, expiry, `alg=none` and foreign signatures |
 | Receipt outbox worker | **Built** — Celery task, idempotent; a signer failure after commit never undoes a redemption |
 | Pilot deployment config | **Built** — Dockerfiles and compose; signer verified internal-only with no DB credentials |
 | End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
-| Test suite | 90 tests passing against real PostgreSQL |
+| Test suite | 131 tests passing against real PostgreSQL |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |
 | Spike S2 (sign/verify) | **PASSED** — pure Dart, no FFI; 9/9 vectors agree on Android; 2.5 ms per verify |
 | Spike S3 (one redemption) | **Done** — 100 concurrent attempts yield exactly one first redemption, stable over repeated runs |

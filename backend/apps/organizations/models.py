@@ -86,6 +86,11 @@ class StaffMembership(models.Model):
     role = models.CharField(max_length=32, choices=StaffRole.choices)
     is_enabled = models.BooleanField(default=True)
     mfa_enabled = models.BooleanField(default=False)
+
+    #: Shared TOTP secret. Credential material: never returned by an API once
+    #: enrolment is confirmed, and never written to an audit record or log.
+    totp_secret = models.CharField(max_length=64, blank=True)
+    mfa_confirmed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     disabled_at = models.DateTimeField(null=True, blank=True)
 
@@ -107,3 +112,18 @@ class StaffMembership(models.Model):
             and self.role == StaffRole.RELEASE_MANAGER
             and self.organization.can_issue
         )
+
+    @property
+    def is_privileged(self) -> bool:
+        """Roles that must hold a second factor."""
+        return self.role in (StaffRole.PLATFORM_ADMIN, StaffRole.RELEASE_MANAGER)
+
+    @property
+    def mfa_satisfied(self) -> bool:
+        """True when this membership meets its MFA obligation.
+
+        Ordinary staff are not forced into MFA; privileged roles are.
+        """
+        if not self.is_privileged:
+            return True
+        return self.mfa_enabled and bool(self.totp_secret) and self.mfa_confirmed_at is not None

@@ -20,7 +20,7 @@ Source: SRS §9. **Do not advance past a gate with an unresolved failure in the 
 | Milestone | State |
 | --- | --- |
 | 1 Freeze protocol + spikes | 🟨 S2 ✅ and S3 ✅ passed. S1 materials ready, phone test not run. Remaining: one physical phone, for the ARM64 confirmation and the camera test |
-| 2 Backend foundation | ✅ |
+| 2 Backend foundation | ✅ including the HTTP-layer isolation gate: a manufacturer cannot read, serialise into, record against or activate another's batch |
 | 3 Manufacturer readiness records | ✅ |
 | 4 Activation and trust | ✅ |
 | 5 Consumer flow | 🟨 backend complete (API, sessions, attestation, signed envelopes); Flutter app not started |
