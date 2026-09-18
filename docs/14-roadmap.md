@@ -25,7 +25,7 @@ Source: SRS §9. **Do not advance past a gate with an unresolved failure in the 
 | 4 Activation and trust | ✅ |
 | 5 Consumer flow | 🟨 backend complete (API, sessions, attestation, signed envelopes); Flutter app not started |
 | 6 Failure handling | ✅ gates met — one redemption under contention, retries, outbox, signer-failure recovery, recall ordering |
-| 7 Physical + operational pilot | ⬜ not started; needs printed labels and phones |
+| 7 Physical + operational pilot | 🟨 backup and restore drill passed; the rest needs printed labels and phones |
 | 8 Further PQC / AI | ⬜ later |
 
 **The backend is feature-complete for the first release.** What remains is the two clients, the physical validation, and the decisions in doc 15.

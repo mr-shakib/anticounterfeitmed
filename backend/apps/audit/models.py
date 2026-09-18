@@ -27,6 +27,7 @@ class AuditAction(models.TextChoices):
     BATCH_RECALLED = "BATCH_RECALLED", "Batch recalled"
     VERIFICATION_COMMITTED = "VERIFICATION_COMMITTED", "Verification committed"
     KEY_REVOKED = "KEY_REVOKED", "Signing key revoked"
+    STAFF_MFA_RESET = "STAFF_MFA_RESET", "Staff second factor reset"
 
 
 class AuditEvent(models.Model):

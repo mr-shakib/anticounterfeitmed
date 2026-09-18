@@ -76,11 +76,15 @@ class ConfirmResult {
   final String operationId;
   final DateTime checkedAt;
 
+  /// False while the event is committed but its receipt is not yet signed.
+  final bool receiptReady;
+
   const ConfirmResult({
     required this.outcome,
     required this.firstVerificationRecorded,
     required this.operationId,
     required this.checkedAt,
+    this.receiptReady = true,
   });
 }
 
@@ -350,9 +354,65 @@ class ApiClient {
       outcome: Outcome.fromWire(status['outcome'] as String?),
       firstVerificationRecorded: body['first_verification_recorded'] as bool? ?? false,
       operationId: body['operation_id'] as String? ?? '',
+      receiptReady: body['receipt_ready'] as bool? ?? false,
       checkedAt: DateTime.tryParse(status['issued_at'] as String? ?? '')?.toLocal() ??
           DateTime.now(),
     );
+  }
+
+  /// Re-reads an earlier attempt without recording a new check.
+  ///
+  /// Used when a confirmation committed but its response never arrived: the
+  /// redemption already stands, and the app is waiting for the signed receipt.
+  Future<ConfirmResult> operationStatus(String operationId) async {
+    final nonce = _nonce();
+    final response = await _http.post(
+      Uri.parse('$baseUrl/v1/consumer/operations/$operationId/status'),
+      headers: await _headers(),
+      body: json.encode({'nonce': nonce}),
+    );
+    if (response.statusCode != 200) {
+      throw ResponseUntrusted('operation status unavailable');
+    }
+    final body = json.decode(response.body) as Map<String, dynamic>;
+    final status = await _openEnvelope(
+      body['status'] as Map<String, dynamic>,
+      expectedNonce: nonce,
+      kind: SigContextKind.status,
+    );
+    return ConfirmResult(
+      outcome: Outcome.fromWire(status['outcome'] as String?),
+      firstVerificationRecorded: false,
+      operationId: operationId,
+      checkedAt: DateTime.tryParse(status['issued_at'] as String? ?? '')?.toLocal() ??
+          DateTime.now(),
+      receiptReady: body['receipt_ready'] as bool? ?? false,
+    );
+  }
+
+  /// Refreshes a package's current status. Never redeems.
+  ///
+  /// A stored receipt cannot know about a recall published after it was made,
+  /// which is why history refreshes rather than trusting what it holds.
+  Future<Outcome> refreshStatus(String token) async {
+    final nonce = _nonce();
+    try {
+      final response = await _http.post(
+        Uri.parse('$baseUrl/v1/consumer/packages/status'),
+        headers: await _headers(),
+        body: json.encode({'token': token, 'nonce': nonce}),
+      );
+      if (response.statusCode != 200) return Outcome.serviceUnavailable;
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      final status = await _openEnvelope(
+        body['status'] as Map<String, dynamic>,
+        expectedNonce: nonce,
+        kind: SigContextKind.status,
+      );
+      return Outcome.fromWire(status['outcome'] as String?);
+    } on SocketException {
+      return Outcome.offline;
+    }
   }
 
   Future<String> fileReport({

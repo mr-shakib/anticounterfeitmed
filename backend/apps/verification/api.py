@@ -206,6 +206,10 @@ def confirm(request):
             "first_verification_recorded": result.first_redemption,
             "operation_id": str(result.operation.id),
             "replayed": result.replayed,
+            # The event is committed either way. This only says whether the
+            # signed receipt is available yet, so the app can poll rather than
+            # implying the verification did not happen.
+            "receipt_ready": result.operation.receipt_ready,
             "status": envelope.as_response(),
         }
     )

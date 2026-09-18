@@ -47,24 +47,70 @@ class LocalSigner:
 
 
 class RemoteSigner:
-    """Calls the isolated signing service over mTLS on the private network."""
+    """Calls the isolated signing service on the private network.
 
-    def __init__(self, url: str) -> None:
+    The transport is mTLS, terminated by the deployment, plus a bearer token so
+    that reaching the port is not the same as being allowed to sign. Failures
+    raise :class:`SignerUnavailable` rather than propagating transport errors,
+    because an activation run treats a signing failure as a per-unit outcome
+    rather than something that aborts the job.
+    """
+
+    #: Signing is fast; a long wait here would stall an activation run rather
+    #: than failing the unit and moving on.
+    timeout_seconds = 10
+
+    def __init__(self, url: str, auth_token: str = "", verify: object = True) -> None:
         if not url:
             raise ImproperlyConfigured("SIGNER_URL is required when SIGNER_MODE=service")
+        if not auth_token:
+            raise ImproperlyConfigured(
+                "SIGNER_AUTH_TOKEN is required when SIGNER_MODE=service"
+            )
         self.url = url.rstrip("/")
+        self._auth_token = auth_token
+        self._verify = verify
 
     def sign(self, *, key_id: str, context: str, payload: bytes) -> bytes:
-        raise NotImplementedError(
-            "The signing service transport is not implemented yet. "
-            "Deploying with SIGNER_MODE=service requires it; see docs/02."
-        )
+        import base64
+
+        import requests
+
+        try:
+            response = requests.post(
+                f"{self.url}/sign",
+                json={
+                    "key_id": key_id,
+                    "context": context,
+                    "payload_b64": base64.b64encode(payload).decode("ascii"),
+                },
+                headers={"Authorization": f"Bearer {self._auth_token}"},
+                timeout=self.timeout_seconds,
+                verify=self._verify,
+            )
+        except requests.RequestException as exc:
+            raise SignerUnavailable(f"signing service unreachable: {exc}") from exc
+
+        if response.status_code != 200:
+            # The body may name a key id but never carries key material.
+            raise SignerUnavailable(
+                f"signing service refused the request ({response.status_code})"
+            )
+
+        try:
+            return base64.b64decode(response.json()["signature_b64"], validate=True)
+        except Exception as exc:
+            raise SignerUnavailable("signing service returned an unusable response") from exc
 
 
 def get_signer() -> Signer:
     mode = getattr(settings, "SIGNER_MODE", "local")
     if mode == "service":
-        return RemoteSigner(getattr(settings, "SIGNER_URL", ""))
+        return RemoteSigner(
+            getattr(settings, "SIGNER_URL", ""),
+            auth_token=getattr(settings, "SIGNER_AUTH_TOKEN", ""),
+            verify=getattr(settings, "SIGNER_TLS_VERIFY", True),
+        )
     if mode == "local":
         allowed = settings.DEBUG or getattr(settings, "SIGNER_ALLOW_INSECURE_LOCAL", False)
         if not allowed:

@@ -179,6 +179,12 @@ SIGNER_MODE = env("SIGNER_MODE", "local")  # "local" | "service"
 # rather than being loosened to accommodate tests.
 SIGNER_ALLOW_INSECURE_LOCAL = env_bool("SIGNER_ALLOW_INSECURE_LOCAL", False)
 SIGNER_URL = os.environ.get("SIGNER_URL", "")
+SIGNER_AUTH_TOKEN = os.environ.get("SIGNER_AUTH_TOKEN", "")
+# Path to the CA bundle that signs the signer's certificate, or False only in
+# a development stack. Never False in a deployed environment.
+SIGNER_TLS_VERIFY = os.environ.get("SIGNER_TLS_VERIFY", "true").lower() not in {
+    "0", "false", "no"
+} and (os.environ.get("SIGNER_CA_BUNDLE") or True)
 
 # Development keystore. Real deployments populate the signing service's own
 # store from a secret manager; the backend never reads this path in "service"

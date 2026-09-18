@@ -51,6 +51,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <>
               <div className="nav-heading">Platform</div>
               <NavLink href="/organizations" label="Organizations" />
+              <NavLink href="/staff" label="Staff access" />
               <NavLink href="/reports" label="Investigations" />
               <NavLink href="/audit" label="Audit trail" />
             </>

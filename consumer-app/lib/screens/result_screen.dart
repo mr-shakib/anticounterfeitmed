@@ -5,19 +5,22 @@
 /// record rather than the medicine.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../core/outcomes.dart';
 import '../screens/report_screen.dart';
 
-class ResultScreen extends StatelessWidget {
+class ResultScreen extends StatefulWidget {
   const ResultScreen({
     super.key,
     required this.outcome,
     required this.checkedAt,
     this.firstVerification = false,
     this.pendingReceipt = false,
+    this.operationId,
     this.externalReference = '',
   });
 
@@ -25,7 +28,58 @@ class ResultScreen extends StatelessWidget {
   final DateTime checkedAt;
   final bool firstVerification;
   final bool pendingReceipt;
+
+  /// Set when a receipt is still being signed, so the screen can poll for it.
+  final String? operationId;
   final String externalReference;
+
+  @override
+  State<ResultScreen> createState() => _ResultScreenState();
+}
+
+class _ResultScreenState extends State<ResultScreen> {
+  late bool _pending = widget.pendingReceipt;
+  Timer? _poll;
+
+  Outcome get outcome => widget.outcome;
+  DateTime get checkedAt => widget.checkedAt;
+  bool get firstVerification => widget.firstVerification;
+  String get externalReference => widget.externalReference;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_pending && widget.operationId != null) _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  /// The verification is already committed at this point. Polling only waits
+  /// for the signed receipt, and giving up never undoes the redemption.
+  void _startPolling() {
+    var attempts = 0;
+    _poll = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      attempts += 1;
+      if (attempts > 10) {
+        timer.cancel();
+        return;
+      }
+      try {
+        final status =
+            await AppScope.of(context).client.operationStatus(widget.operationId!);
+        if (status.receiptReady && mounted) {
+          timer.cancel();
+          setState(() => _pending = false);
+        }
+      } catch (_) {
+        // A failed poll is not a failed verification; keep waiting.
+      }
+    });
+  }
 
   Color _tone(BuildContext context) {
     if (outcome.isRestriction) return Theme.of(context).colorScheme.errorContainer;
@@ -73,7 +127,7 @@ class ResultScreen extends StatelessWidget {
                     Text(s.firstVerificationRecorded,
                         style: Theme.of(context).textTheme.bodySmall),
                   ],
-                  if (pendingReceipt) ...[
+                  if (_pending) ...[
                     const SizedBox(height: 8),
                     Text(s.pendingReceipt,
                         style: Theme.of(context).textTheme.bodySmall),

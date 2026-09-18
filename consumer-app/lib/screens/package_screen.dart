@@ -58,6 +58,9 @@ class _PackageScreenState extends State<PackageScreen> {
             outcome: result.outcome,
             checkedAt: result.checkedAt,
             firstVerification: result.firstVerificationRecorded,
+            // The event is committed; only the receipt may still be pending.
+            pendingReceipt: !result.receiptReady,
+            operationId: result.operationId,
           ),
         ),
       );

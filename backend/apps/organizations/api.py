@@ -23,6 +23,7 @@ from apps.organizations import mfa
 from apps.organizations.models import StaffMembership
 from apps.organizations.permissions import (
     STAFF_AUTH,
+    IsPlatformAdmin,
     MFA_SESSION_KEY,
     IsStaff,
     membership_for,
@@ -196,3 +197,57 @@ def mfa_verify(request):
 
     request.session[MFA_SESSION_KEY] = str(membership.id)
     return Response(_membership_payload(membership, request))
+
+
+@api_view(["POST"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsPlatformAdmin])
+def reset_membership_mfa(request, membership_id):
+    """Clear a staff member's second factor so they can enrol again.
+
+    Someone who loses their phone would otherwise be locked out of a privileged
+    role permanently. Clearing it does not grant access: the next login lands in
+    enrolment and cannot proceed without completing it.
+    """
+    membership = StaffMembership.objects.filter(pk=membership_id).first()
+    if membership is None:
+        return Response({"code": "NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
+
+    membership.totp_secret = ""
+    membership.mfa_enabled = False
+    membership.mfa_confirmed_at = None
+    membership.save(update_fields=["totp_secret", "mfa_enabled", "mfa_confirmed_at"])
+
+    AuditEvent.objects.create(
+        action=AuditAction.STAFF_MFA_RESET,
+        organization=membership.organization,
+        actor_user=request.user,
+        reason="Second factor reset for "
+        f"{membership.user.get_username()} by {request.user.get_username()}",
+        detail={"membership_id": str(membership.id), "action": "MFA_RESET"},
+    )
+    return Response({"membership_id": str(membership.id), "mfa_enrolled": False})
+
+
+@api_view(["GET"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsPlatformAdmin])
+def list_memberships(request):
+    """Staff across all organizations, for access review."""
+    memberships = StaffMembership.objects.select_related(
+        "user", "organization"
+    ).order_by("organization__name", "user__username")
+    return Response(
+        [
+            {
+                "membership_id": str(m.id),
+                "username": m.user.get_username(),
+                "organization": m.organization.name,
+                "role": m.role,
+                "is_enabled": m.is_enabled,
+                "mfa_required": m.is_privileged,
+                "mfa_enrolled": m.mfa_satisfied,
+            }
+            for m in memberships
+        ]
+    )

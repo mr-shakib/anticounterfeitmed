@@ -63,5 +63,11 @@ apk:  ## Build the Android self-check APK into dist/
 	cp consumer-app/build/app/outputs/flutter-apk/app-release.apk dist/medsecure-selfcheck-arm64.apk
 	@sha256sum dist/medsecure-selfcheck-arm64.apk
 
+backup:  ## Take an encrypted backup into ./backups
+	BACKUP_PASSPHRASE=$${BACKUP_PASSPHRASE} ./infra/backup.sh ./backups
+
+restore-drill:  ## Restore the newest backup in isolation and verify it (docs/11)
+	./infra/restore-drill.sh $$(ls -t ./backups/*.dump* 2>/dev/null | head -1)
+
 check: test vectors crosscheck leakcheck  ## Everything CI runs
 	@echo "all checks passed"

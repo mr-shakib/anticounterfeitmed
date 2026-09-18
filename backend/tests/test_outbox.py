@@ -169,3 +169,24 @@ def test_receipt_gives_up_after_repeated_failures(client, active_package, monkey
     # Even after giving up on the receipt, the redemption stands.
     unit.refresh_from_db()
     assert unit.lifecycle == UnitLifecycle.REDEEMED
+
+
+@pytest.mark.django_db(transaction=True)
+def test_confirm_tells_the_app_the_receipt_is_not_ready_yet(client, active_package):
+    """The event is committed; the receipt is not. The app must be able to tell.
+
+    Without this the app would either claim a receipt it does not have, or
+    imply the verification failed when it plainly succeeded.
+    """
+    _org, unit, token = active_package
+    credential = make_session(client)
+    confirmed = confirm_once(client, credential, token)
+
+    assert confirmed["first_verification_recorded"] is True
+    assert confirmed["receipt_ready"] is False
+
+    sign_pending_receipts()
+
+    url = reverse("consumer-operation-status", args=[confirmed["operation_id"]])
+    polled = client.post(url, {"nonce": "n"}, format="json", **auth(credential))
+    assert polled.data["receipt_ready"] is True

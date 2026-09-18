@@ -3,7 +3,7 @@ name = "medsigner"
 version = "0.1.0"
 description = "Isolated ML-DSA signing service for the medicine verification platform."
 requires-python = ">=3.12"
-dependencies = ["medcrypto"]
+dependencies = ["medcrypto", "fastapi>=0.115", "uvicorn[standard]>=0.30"]
 
 [build-system]
 requires = ["setuptools>=68"]

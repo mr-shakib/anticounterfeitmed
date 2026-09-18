@@ -20,4 +20,8 @@ RUN useradd --create-home --uid 10002 signer && mkdir -p /keys && chown signer /
 USER signer
 
 ENV SIGNER_KEYSTORE_PATH=/keys
-CMD ["python", "-c", "print('signer image ready; transport not implemented (docs/02)')"]
+EXPOSE 9000
+# One worker: signing is fast, and a single process keeps key material in one
+# place rather than copied across several.
+CMD ["uvicorn", "medsigner.server:create_app", "--factory", \
+     "--host", "0.0.0.0", "--port", "9000", "--workers", "1"]

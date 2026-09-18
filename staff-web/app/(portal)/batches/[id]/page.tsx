@@ -113,6 +113,32 @@ export default function BatchDetailPage({
       setJob(result);
     });
 
+  const blockUnit = (unit: Unit) => {
+    const reason = window.prompt(
+      `Block ${unit.external_reference}?\n\n` +
+        'A blocked unit cannot record a first verification. Verifications ' +
+        'already recorded remain in the record.\n\nReason:',
+    );
+    if (!reason) return;
+    void run(async () => {
+      await api.post(`/v1/staff/units/${unit.id}/block`, { reason });
+      setNotice(`${unit.external_reference} blocked.`);
+    });
+  };
+
+  const retryFailures = () =>
+    run(async () => {
+      if (!job) return;
+      const result = await api.post<ActivationJob>(
+        `/v1/staff/activation-jobs/${job.id}/retry`,
+      );
+      setJob(result);
+      setNotice(
+        `Retried ${result.requested} previously failed unit(s): ` +
+          `${result.succeeded} activated, ${result.failed} still failing.`,
+      );
+    });
+
   const recall = () =>
     run(async () => {
       await api.post(`/v1/staff/batches/${id}/recall`, { notice: recallNotice });
@@ -273,6 +299,11 @@ export default function BatchDetailPage({
                         <li key={f.unit_id} className="mono">{f.reason}</li>
                       ))}
                     </ul>
+                    <p style={{ margin: "0.75rem 0 0" }}>
+                      <button onClick={retryFailures} disabled={busy}>
+                        Retry only the failures
+                      </button>
+                    </p>
                   </>
                 )}
               </div>
@@ -303,7 +334,7 @@ export default function BatchDetailPage({
       <h2>Unit list</h2>
       <table>
         <thead>
-          <tr><th>Reference</th><th>Lifecycle</th><th>Activated</th><th>Verified</th></tr>
+          <tr><th>Reference</th><th>Lifecycle</th><th>Activated</th><th>Verified</th><th></th></tr>
         </thead>
         <tbody>
           {units.slice(0, 50).map((u) => (
@@ -317,10 +348,17 @@ export default function BatchDetailPage({
               </td>
               <td className="muted">{u.activated_at?.slice(0, 10) ?? "—"}</td>
               <td className="muted">{u.redeemed_at?.slice(0, 10) ?? "—"}</td>
+              <td>
+                {!u.is_blocked && u.lifecycle !== "VOID" && (
+                  <button className="danger" onClick={() => blockUnit(u)} disabled={busy}>
+                    Block
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
           {units.length === 0 && (
-            <tr><td colSpan={4} className="muted">No units yet.</td></tr>
+            <tr><td colSpan={5} className="muted">No units yet.</td></tr>
           )}
         </tbody>
       </table>

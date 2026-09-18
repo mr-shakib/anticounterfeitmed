@@ -45,6 +45,12 @@ services:
       - ${SIGNER_KEYS_HOST_PATH:-./keys}:/keys:ro
     environment:
       SIGNER_KEYSTORE_PATH: /keys
+      # Reaching the port is not the same as being allowed to sign.
+      SIGNER_AUTH_TOKEN: ${SIGNER_AUTH_TOKEN}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:9000/healthz')\""]
+      interval: 30s
+      retries: 3
 
   api:
     build:

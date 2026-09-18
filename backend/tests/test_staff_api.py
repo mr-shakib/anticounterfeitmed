@@ -488,3 +488,163 @@ def test_portal_origin_is_trusted_for_csrf(settings):
     assert any("3000" in o or "3100" in o for o in settings.CSRF_TRUSTED_ORIGINS), (
         "the development portal origin is not trusted"
     )
+
+
+# --- MFA recovery -----------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_can_reset_a_lost_second_factor(platform_admin, make_manufacturer):
+    """Losing a phone must not lock someone out of a privileged role forever."""
+    target = make_manufacturer("Alpha")
+    assert target["membership"].mfa_satisfied
+
+    client = APIClient()
+    sign_in(client, platform_admin)
+    response = client.post(
+        reverse("admin-membership-reset-mfa", args=[target["membership"].id]),
+        {},
+        format="json",
+    )
+    assert response.status_code == 200
+
+    target["membership"].refresh_from_db()
+    assert not target["membership"].mfa_satisfied
+    assert target["membership"].totp_secret == ""
+
+
+@pytest.mark.django_db(transaction=True)
+def test_resetting_the_factor_does_not_grant_access(platform_admin, make_manufacturer):
+    """After a reset the next sign-in must land in enrolment, not straight in."""
+    target = make_manufacturer("Alpha")
+    admin_client = APIClient()
+    sign_in(admin_client, platform_admin)
+    admin_client.post(
+        reverse("admin-membership-reset-mfa", args=[target["membership"].id]),
+        {}, format="json",
+    )
+
+    client = APIClient()
+    login = client.post(
+        reverse("staff-login"),
+        {"username": target["user"].get_username(), "password": PASSWORD},
+        format="json",
+    )
+    assert login.status_code == 200
+    assert login.data["mfa_required"] is True
+    assert login.data["mfa_enrolled"] is False
+    # And the password-only session still reaches nothing.
+    assert client.get(reverse("staff-products")).status_code == 403
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_reset_is_recorded_in_the_audit_trail(platform_admin, make_manufacturer):
+    from apps.audit.models import AuditAction, AuditEvent
+
+    target = make_manufacturer("Alpha")
+    client = APIClient()
+    sign_in(client, platform_admin)
+    client.post(
+        reverse("admin-membership-reset-mfa", args=[target["membership"].id]),
+        {}, format="json",
+    )
+
+    event = AuditEvent.objects.filter(action=AuditAction.STAFF_MFA_RESET).first()
+    assert event is not None
+    assert target["user"].get_username() in event.reason
+    # The secret must never appear in an audit record.
+    assert "totp" not in str(event.detail).lower()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_manufacturer_cannot_reset_anyone(make_manufacturer):
+    alpha = make_manufacturer("Alpha")
+    beta = make_manufacturer("Beta")
+    client = APIClient()
+    sign_in(client, alpha)
+
+    for target in (alpha, beta):
+        response = client.post(
+            reverse("admin-membership-reset-mfa", args=[target["membership"].id]),
+            {}, format="json",
+        )
+        assert response.status_code == 403
+
+
+# --- unit blocking and retry ------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_blocking_a_unit_stops_later_first_verifications(make_manufacturer):
+    from apps.verification.models import VerificationOutcome
+    from apps.verification.services import confirm_verification
+    from tests.conftest import make_session_and_challenge
+
+    actor = make_manufacturer("Alpha")
+    result = create_print_job(batch=actor["batch"], count=1)
+    unit = PackageUnit.objects.get(pk=result.units[0].unit_id)
+    for step in (ManufacturingStep.PRINTED, ManufacturingStep.QC_PASSED,
+                 ManufacturingStep.COATED):
+        record_completion(unit=unit, step=step, completed_at=timezone.now(),
+                          recorded_by=actor["user"], source_reference="log")
+
+    client = APIClient()
+    sign_in(client, actor)
+    client.post(reverse("staff-activation-jobs"),
+                {"batch": str(actor["batch"].id)}, format="json")
+
+    blocked = client.post(
+        reverse("staff-unit-block", args=[unit.id]),
+        {"reason": "Reported as tampered"},
+        format="json",
+    )
+    assert blocked.status_code == 200
+
+    unit.refresh_from_db()
+    assert unit.is_blocked
+
+    session, challenge = make_session_and_challenge(unit)
+    outcome = confirm_verification(
+        session=session, unit_id=unit.id, challenge_id=challenge.id,
+        idempotency_key="after-block", body={"u": str(unit.id)},
+    )
+    assert outcome.outcome == VerificationOutcome.RESTRICTED
+    assert not outcome.first_redemption
+
+
+@pytest.mark.django_db(transaction=True)
+def test_manufacturer_cannot_block_another_manufacturers_unit(make_manufacturer):
+    alpha = make_manufacturer("Alpha")
+    beta = make_manufacturer("Beta")
+    unit = PackageUnit.objects.get(
+        pk=create_print_job(batch=beta["batch"], count=1).units[0].unit_id
+    )
+
+    client = APIClient()
+    sign_in(client, alpha)
+    response = client.post(
+        reverse("staff-unit-block", args=[unit.id]), {"reason": "x"}, format="json"
+    )
+    assert response.status_code == 404
+    unit.refresh_from_db()
+    assert not unit.is_blocked
+
+
+@pytest.mark.django_db(transaction=True)
+def test_admin_can_block_a_unit_in_an_emergency(platform_admin, make_manufacturer):
+    """Emergency restriction is an admin function, unlike activation."""
+    target = make_manufacturer("Alpha")
+    unit = PackageUnit.objects.get(
+        pk=create_print_job(batch=target["batch"], count=1).units[0].unit_id
+    )
+
+    client = APIClient()
+    sign_in(client, platform_admin)
+    response = client.post(
+        reverse("staff-unit-block", args=[unit.id]),
+        {"reason": "Regulator instruction"},
+        format="json",
+    )
+    assert response.status_code == 200
+    unit.refresh_from_db()
+    assert unit.is_blocked

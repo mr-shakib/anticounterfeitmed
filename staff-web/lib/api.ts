@@ -192,6 +192,16 @@ export type Report = {
   created_at: string;
 };
 
+export type Membership2 = {
+  membership_id: string;
+  username: string;
+  organization: string;
+  role: string;
+  is_enabled: boolean;
+  mfa_required: boolean;
+  mfa_enrolled: boolean;
+};
+
 export type Dashboard = {
   organizations_pending: number;
   organizations_suspended: number;

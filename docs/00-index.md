@@ -36,7 +36,7 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | Backend data model | All 9 apps, migrations applied to PostgreSQL 17 |
 | Confirm transaction | Built, with fixed lock order and post-lock idempotency recheck |
 | Serialization + manufacturing records | Built — token generation, print jobs, ordered step recording, QC rejection voids |
-| Signing service (`medsigner`) | Built — isolated package, holds seeds, signs opaque bytes; in-process signing refused outside DEBUG |
+| Signing service (`medsigner`) | **Built, with its HTTP transport** — isolated service, bearer-token authenticated, path-traversal safe, never logs a payload |
 | Activation + trust manifest | Built — per-unit signed credentials, honest partial-failure reporting, retry-failures-only, versioned root-signed manifest |
 | Prepare (preview) | Built — issues challenges, never redeems |
 | Consumer HTTP API | Built — sessions, trust manifest, prepare, confirm, operation status, package status, reports |
@@ -48,8 +48,9 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | Firebase App Check verification | **Built** — offline JWKS verification; rejects wrong issuer/audience/app, expiry, `alg=none` and foreign signatures |
 | Receipt outbox worker | **Built** — Celery task, idempotent; a signer failure after commit never undoes a redemption |
 | Pilot deployment config | **Built** — Dockerfiles and compose; signer verified internal-only with no DB credentials |
+| Backup and restore drill | **Built and performed** — encrypted backup, isolated restore; redeemed units survived, the uniqueness index returned, a duplicate first redemption was refused, all credentials re-verified |
 | End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
-| Test suite | 132 backend tests against real PostgreSQL, 22 Flutter tests, 4 on-device live-API tests |
+| Test suite | 151 backend tests against real PostgreSQL, 22 Flutter tests, 4 on-device live-API tests |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |
 | Spike S2 (sign/verify) | **PASSED** — pure Dart, no FFI; 9/9 vectors agree on Android; 2.5 ms per verify |
 | Spike S3 (one redemption) | **Done** — 100 concurrent attempts yield exactly one first redemption, stable over repeated runs |
