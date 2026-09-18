@@ -24,7 +24,7 @@ class Strings {
   String _pick(String en, String bn) => _bn ? bn : en;
 
   // --- shell ---------------------------------------------------------------
-  String get appName => 'MedSecure PQC';
+  String get appName => 'Anticounterfeit Med';
   String get scanTitle => _pick('Scan the code', 'কোডটি স্ক্যান করুন');
   String get historyTitle => _pick('My checks', 'আমার যাচাইসমূহ');
   String get reportTitle => _pick('Report a concern', 'উদ্বেগ জানান');
@@ -40,8 +40,8 @@ class Strings {
       );
   String get torch => _pick('Light', 'আলো');
   String get notOurCode => _pick(
-        'That is not a MedSecure code.',
-        'এটি MedSecure কোড নয়।',
+        'That is not an Anticounterfeit Med code.',
+        'এটি Anticounterfeit Med কোড নয়।',
       );
   String get cameraUnavailable => _pick(
         'The camera is not available.',

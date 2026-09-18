@@ -1,1 +1,1 @@
-default-src 'none'; script-src 'sha256-zMkY2w4HVZpa767sqRJ459OBVAZ/JcAhMICXtUs4ick='; style-src 'sha256-sXJXXy3Cq2RmSqGZbqQi/P5VGdi72UgNvhQAHF9tr58='; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'none'
+default-src 'none'; script-src 'sha256-zMkY2w4HVZpa767sqRJ459OBVAZ/JcAhMICXtUs4ick='; style-src 'sha256-bmGX7cjTbd6qN48z2kqLf4wuHcb89RzfWZJ6zaskzhk='; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'none'

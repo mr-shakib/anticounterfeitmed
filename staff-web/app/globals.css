@@ -51,8 +51,18 @@ h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
   width: 230px; flex-shrink: 0; background: var(--surface);
   border-right: 1px solid var(--border); padding: 1.25rem 0;
 }
-.brand { padding: 0 1.25rem 1rem; border-bottom: 1px solid var(--border); }
-.brand strong { display: block; font-size: 0.95rem; }
+.brand {
+  padding: 0 1.25rem 1rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 0.7rem;
+}
+.brand img { flex-shrink: 0; }
+.brand strong { display: block; font-size: 0.95rem; line-height: 1.2; }
+.brand .muted { font-size: 0.82rem; }
+
+.auth-brand {
+  display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;
+}
+.auth-brand h1 { margin: 0; }
 .nav { padding: 0.75rem 0.5rem; display: flex; flex-direction: column; gap: 2px; }
 .nav a {
   padding: 0.5rem 0.75rem; border-radius: var(--radius); color: var(--text);

@@ -11,16 +11,16 @@ import 'package:flutter/material.dart';
 import 'app_state.dart';
 import 'screens/scan_screen.dart';
 
-void main() => runApp(const MedSecureApp());
+void main() => runApp(const AnticounterfeitMedApp());
 
-class MedSecureApp extends StatefulWidget {
-  const MedSecureApp({super.key});
+class AnticounterfeitMedApp extends StatefulWidget {
+  const AnticounterfeitMedApp({super.key});
 
   @override
-  State<MedSecureApp> createState() => _MedSecureAppState();
+  State<AnticounterfeitMedApp> createState() => _AnticounterfeitMedAppState();
 }
 
-class _MedSecureAppState extends State<MedSecureApp> {
+class _AnticounterfeitMedAppState extends State<AnticounterfeitMedApp> {
   final AppState _state = AppState();
 
   @override
@@ -34,7 +34,7 @@ class _MedSecureAppState extends State<MedSecureApp> {
     return AppScope(
       state: _state,
       child: MaterialApp(
-        title: 'MedSecure PQC',
+        title: 'Anticounterfeit Med',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorSchemeSeed: const Color(0xFF0B6B5E),

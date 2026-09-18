@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ApiError, Membership, api, primeCsrf } from "@/lib/api";
 
@@ -73,7 +74,10 @@ export default function LoginPage() {
   return (
     <main className="center">
       <div className="card auth-card">
-        <h1>MedSecure PQC</h1>
+        <div className="auth-brand">
+          <Image src="/mark.png" alt="" width={64} height={64} priority />
+          <h1>Anticounterfeit Med</h1>
+        </div>
         <p className="muted">Manufacturer and platform administration.</p>
 
         {error && <div className="alert error">{error}</div>}

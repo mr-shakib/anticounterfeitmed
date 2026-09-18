@@ -60,14 +60,19 @@ serve:  ## Run the backend, admin at http://127.0.0.1:8000/admin/
 apk:  ## Build the Android self-check APK into dist/
 	cd consumer-app && flutter build apk --release --target-platform=android-arm64
 	mkdir -p dist
-	cp consumer-app/build/app/outputs/flutter-apk/app-release.apk dist/medsecure-selfcheck-arm64.apk
-	@sha256sum dist/medsecure-selfcheck-arm64.apk
+	cp consumer-app/build/app/outputs/flutter-apk/app-release.apk dist/anticounterfeitmed-selfcheck-arm64.apk
+	@sha256sum dist/anticounterfeitmed-selfcheck-arm64.apk
 
 backup:  ## Take an encrypted backup into ./backups
 	BACKUP_PASSPHRASE=$${BACKUP_PASSPHRASE} ./infra/backup.sh ./backups
 
 restore-drill:  ## Restore the newest backup in isolation and verify it (docs/11)
 	./infra/restore-drill.sh $$(ls -t ./backups/*.dump* 2>/dev/null | head -1)
+
+brand:  ## Regenerate every sized copy of the project mark
+	$(PY) scripts/build_brand_assets.py
+	$(PY) scripts/build_landing_csp.py
+	cp landing/nginx.conf infra/nginx/conf.d/site.conf
 
 check: test vectors crosscheck leakcheck  ## Everything CI runs
 	@echo "all checks passed"

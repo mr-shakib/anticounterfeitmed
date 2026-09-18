@@ -125,7 +125,7 @@ def main() -> None:
 </style>
 </head>
 <body>
-<h1>Physical QR test sheet &mdash; MedSecure PQC</h1>
+<h1>Physical QR test sheet &mdash; Anticounterfeit Med</h1>
 <div class="warn">
   <strong>Print at 100% scale.</strong> Turn off &ldquo;fit to page&rdquo;,
   &ldquo;shrink oversized pages&rdquo; and any scaling in the print dialog, then

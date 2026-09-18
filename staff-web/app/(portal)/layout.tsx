@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -33,8 +34,17 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <strong>MedSecure PQC</strong>
-          <span className="muted">{membership.organization.name}</span>
+          <Image
+            src="/mark.png"
+            alt=""
+            width={40}
+            height={40}
+            priority
+          />
+          <div>
+            <strong>Anticounterfeit Med</strong>
+            <span className="muted">{membership.organization.name}</span>
+          </div>
         </div>
         <nav className="nav">
           <NavLink href="/" label="Overview" />

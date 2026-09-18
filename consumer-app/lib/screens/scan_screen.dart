@@ -111,7 +111,13 @@ class _ScanScreenState extends State<ScanScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(s.scanTitle),
+        title: Row(
+          children: [
+            Image.asset('assets/brand/mark.png', width: 28, height: 28),
+            const SizedBox(width: 10),
+            Flexible(child: Text(s.scanTitle, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: state.toggleLanguage,
@@ -148,15 +154,19 @@ class _ScanScreenState extends State<ScanScreen> {
                       MaterialPageRoute(builder: (_) => const ReportScreen()),
                     ),
                   ),
-                ),
-                // Framing guidance.
-                IgnorePointer(
-                  child: Container(
-                    width: 220,
-                    height: 220,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white70, width: 3),
-                      borderRadius: BorderRadius.circular(12),
+                  // Framing guidance belongs to the preview, so it disappears
+                  // with it. Drawn as a stack sibling it would sit on top of
+                  // the camera-unavailable message and cut the text in half.
+                  overlayBuilder: (context, constraints) => IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white70, width: 3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                   ),
                 ),

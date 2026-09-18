@@ -17,7 +17,7 @@ from django.utils import timezone
 #: Accept one step either side of now, to tolerate clock drift on cheap phones.
 VALID_WINDOW = 1
 
-ISSUER = "MedSecure PQC"
+ISSUER = "Anticounterfeit Med"
 
 
 def new_secret() -> str:

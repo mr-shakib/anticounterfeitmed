@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Verify your medicine — MedSecure PQC</title>
-<meta name="description" content="How to check a medicine package with the official MedSecure PQC app.">
+<title>Verify your medicine — Anticounterfeit Med</title>
+<meta name="description" content="How to check a medicine package with the official Anticounterfeit Med app.">
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex">
+<link rel="icon" href="favicon.png" type="image/png">
 <script>
 /* Runs before anything renders.
    The scanned QR puts a package token in the URL fragment. Strip it from the
@@ -59,7 +60,9 @@
   }
   .wrap { max-width: 34rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
   header { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.5rem; }
-  .mark { font-size: .78rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0 0 .4rem; }
+  .brand { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+  .brand img { width: 52px; height: 52px; flex-shrink: 0; }
+  .mark { font-size: .78rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0; }
   h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 .35rem; }
   .bn { font-size: 1.15rem; color: var(--muted); margin: 0; }
   h2 { font-size: 1.1rem; margin: 2rem 0 .75rem; }
@@ -110,7 +113,11 @@
 <div class="wrap">
 
   <header>
-    <p class="mark">MedSecure PQC</p>
+    <div class="brand">
+      <img src="mark.png" width="52" height="52"
+           alt="Anticounterfeit Med" decoding="async">
+      <p class="mark">Anticounterfeit Med</p>
+    </div>
     <h1>Open the official app to check this package</h1>
     <p class="bn">এই প্যাকেটটি যাচাই করতে অফিশিয়াল অ্যাপটি খুলুন</p>
   </header>
@@ -127,8 +134,8 @@
   <h2>What to do / যা করবেন</h2>
   <ol>
     <li>
-      <span class="en">Install the official MedSecure PQC app.</span>
-      <span class="bn">অফিশিয়াল MedSecure PQC অ্যাপটি ইনস্টল করুন।</span>
+      <span class="en">Install the official Anticounterfeit Med app.</span>
+      <span class="bn">অফিশিয়াল Anticounterfeit Med অ্যাপটি ইনস্টল করুন।</span>
     </li>
     <li>
       <span class="en">Scratch off the silver coating over the QR code on the strip.</span>
