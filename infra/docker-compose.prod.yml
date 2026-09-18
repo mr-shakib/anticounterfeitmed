@@ -89,6 +89,14 @@ services:
     networks: [internal]
     command: celery -A config beat -l info
 
+  hub:
+    build:
+      context: ..
+      dockerfile: hub/Dockerfile
+    restart: unless-stopped
+    networks: [edge]
+    expose: ["8080"]
+
   portal:
     build:
       context: ..

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import JSZip from "jszip";
 import QRCode from "qrcode";
 
 /**
@@ -80,36 +81,53 @@ export function LabelSheet({
         {EC_LEVEL}. Print at 100% scale with no fitting, on the real packaging
         material, and measure one label before running the job.
       </p>
-      <button onClick={() => openPrintableSheet(entries, batchNumber, sizeMm)}>
-        Open printable sheet
-      </button>
+      <div className="row" style={{ gap: "0.5rem" }}>
+        <div className="shrink">
+          <button onClick={() => openPrintableSheet(entries, batchNumber, sizeMm)}>
+            Open printable sheet
+          </button>
+        </div>
+        <div className="shrink">
+          <button
+            className="secondary"
+            onClick={() => downloadPrintableSheet(entries, batchNumber, sizeMm)}
+          >
+            Download sheet (HTML)
+          </button>
+        </div>
+        <div className="shrink">
+          <button
+            className="secondary"
+            onClick={() => downloadQrArchive(entries, batchNumber, sizeMm)}
+          >
+            Download QR codes (ZIP)
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 /**
- * Opens a print-ready sheet in a new window.
+ * Builds the print-ready sheet as a standalone HTML document.
  *
- * A new window rather than a file download: the labels exist only in this
- * page's memory, and printing directly avoids writing thousands of tokens to
- * disk as a side effect of wanting to print them.
+ * Self-contained: the QR codes are inline SVG, so the file prints correctly
+ * from any machine with no network and nothing else to copy alongside it.
  */
-export async function openPrintableSheet(
+async function buildSheetHtml(
   entries: LabelEntry[],
   batchNumber: string,
   sizeMm: number,
-) {
-  const win = window.open("", "_blank");
-  if (!win) {
-    window.alert("Allow pop-ups for this site to open the printable sheet.");
-    return;
-  }
-
-  win.document.write(
-    `<!doctype html><title>Labels — ${batchNumber}</title>` +
-      `<p style="font:14px system-ui;padding:16px">Rendering ${entries.length} labels…</p>`,
-  );
-
+): Promise<string> {
   const svgs = await Promise.all(entries.map((e) => renderSvg(e.qr_url)));
   const labels = entries
     .map(
@@ -119,8 +137,7 @@ export async function openPrintableSheet(
     )
     .join("");
 
-  win.document.open();
-  win.document.write(`<!doctype html>
+  return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -136,7 +153,6 @@ export async function openPrintableSheet(
   .qr { width: ${sizeMm}mm; height: ${sizeMm}mm; }
   .qr svg { width: 100%; height: 100%; display: block; }
   figcaption { font-family: ui-monospace, monospace; font-size: 6pt; margin-top: 0.8mm; }
-  @media print { .warn { border-color: #000; } }
 </style>
 </head>
 <body>
@@ -154,6 +170,86 @@ export async function openPrintableSheet(
   </div>
   <div class="grid">${labels}</div>
 </body>
-</html>`);
+</html>`;
+}
+
+/** Downloads the printable sheet as a single self-contained HTML file. */
+export async function downloadPrintableSheet(
+  entries: LabelEntry[],
+  batchNumber: string,
+  sizeMm: number,
+) {
+  const html = await buildSheetHtml(entries, batchNumber, sizeMm);
+  saveBlob(new Blob([html], { type: "text/html" }), `labels-${batchNumber}.html`);
+}
+
+/**
+ * Downloads one SVG per label, zipped.
+ *
+ * This is the form label software and printers generally want: a file per unit,
+ * named by its printed reference, so a run can be laid out without re-deriving
+ * anything. SVG rather than PNG because the symbol must stay sharp at whatever
+ * size the press uses.
+ */
+export async function downloadQrArchive(
+  entries: LabelEntry[],
+  batchNumber: string,
+  sizeMm: number,
+) {
+  const zip = new JSZip();
+  const folder = zip.folder(`labels-${batchNumber}`)!;
+
+  const svgs = await Promise.all(entries.map((e) => renderSvg(e.qr_url)));
+  entries.forEach((entry, index) => {
+    // The mm size is written onto the SVG so the intended footprint travels
+    // with the file rather than living only in an instruction someone forgets.
+    const sized = svgs[index].replace(
+      /<svg([^>]*)>/,
+      `<svg$1 width="${sizeMm}mm" height="${sizeMm}mm">`,
+    );
+    folder.file(`${entry.external_reference}.svg`, sized);
+  });
+
+  folder.file(
+    "README.txt",
+    [
+      `Labels for batch ${batchNumber}`,
+      `${entries.length} units, ${sizeMm}mm footprint, error correction ${EC_LEVEL}.`,
+      "",
+      "One SVG per unit, named by the reference printed beside the code.",
+      "The footprint includes the quiet zone. Print at 100% scale, on the real",
+      "packaging material, and measure one label before running the job.",
+      "Do not place a logo inside a code.",
+      "",
+      "These codes cannot be regenerated. Keep this archive under the same",
+      "controls as the printed labels and destroy it once the job is reconciled.",
+    ].join("\n"),
+  );
+
+  const blob = await zip.generateAsync({ type: "blob" });
+  saveBlob(blob, `labels-${batchNumber}-qr.zip`);
+}
+
+/**
+ * Opens a print-ready sheet in a new window, for printing straight away.
+ */
+export async function openPrintableSheet(
+  entries: LabelEntry[],
+  batchNumber: string,
+  sizeMm: number,
+) {
+  const win = window.open("", "_blank");
+  if (!win) {
+    window.alert("Allow pop-ups for this site, or use the download instead.");
+    return;
+  }
+  win.document.write(
+    `<!doctype html><title>Labels — ${batchNumber}</title>` +
+      `<p style="font:14px system-ui;padding:16px">Rendering ${entries.length} labels…</p>`,
+  );
+
+  const html = await buildSheetHtml(entries, batchNumber, sizeMm);
+  win.document.open();
+  win.document.write(html);
   win.document.close();
 }
