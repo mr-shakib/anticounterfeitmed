@@ -43,9 +43,10 @@ serve-nomfa:  ## Run the backend without the staff second factor (DEBUG only)
 seed:  ## Seed a demo manufacturer, batch and activated units
 	DJANGO_DEBUG=1 $(PY) backend/manage.py seed_demo --count 3
 
-staff:  ## Create or reset the demo portal accounts (admin + release manager)
+staff:  ## Create or reset the three demo portal accounts, one per role
 	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-admin --role PLATFORM_ADMIN
 	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-release-manager --role RELEASE_MANAGER
+	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-staff --role MANUFACTURER_STAFF
 
 staff-code:  ## Print a second-factor code: make staff-code USER=demo-admin
 	@DJANGO_DEBUG=1 $(PY) backend/manage.py staff_code $(USER)

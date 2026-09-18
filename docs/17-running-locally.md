@@ -107,17 +107,20 @@ backend is not on port 8000.
 make staff
 ```
 
-That makes two accounts, both with the password `devpassword123`, and enrols a
-second factor for each:
+That makes one account per role, all with the password `devpassword123`:
 
-| Username | Role | Sees |
-| --- | --- | --- |
-| `demo-admin` | Platform admin | Organizations, investigations, audit, staff access |
-| `demo-release-manager` | Release manager | Products, batches, labels, activation, recall |
+| Username | Role | Second factor | Sees |
+| --- | --- | --- | --- |
+| `demo-admin` | Platform admin | required | Organizations, investigations, audit, staff access |
+| `demo-release-manager` | Release manager | required | Products, batches, labels, activation, recall |
+| `demo-staff` | Manufacturer staff | not required | The same manufacturer screens, but cannot activate or recall |
 
-Signing in takes two steps for both, because each is a privileged role. After
-the password, the portal asks for a six-digit code. Without an authenticator app
-to hand:
+`demo-staff` signs in with the password alone, because the second factor is only
+demanded of roles that can release medicine into circulation or suspend an
+issuer. It is the quickest way in when you just want to look around.
+
+For the other two the portal asks for a six-digit code after the password.
+Without an authenticator app to hand:
 
 ```bash
 make staff-code USER=demo-admin
