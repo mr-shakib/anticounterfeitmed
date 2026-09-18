@@ -99,34 +99,47 @@ The portal proxies `/v1/*` to the backend, so the session cookie is first-party
 and there is no CORS to configure. `BACKEND_ORIGIN` overrides the target if the
 backend is not on port 8000.
 
-Sign in with a staff account. To make the seeded release manager usable:
+### Signing in
+
+`make seed` creates data but no usable sign-in, so create the demo accounts:
 
 ```bash
-DJANGO_DEBUG=1 .venv/bin/python backend/manage.py shell -c "
-from apps.organizations.models import StaffMembership
-m = StaffMembership.objects.filter(role='RELEASE_MANAGER').first()
-m.user.set_password('devpassword123'); m.user.save()
-print('user:', m.user.get_username())"
+make staff
 ```
 
-Signing in as a release manager asks for a second factor. On first sign-in the
-portal offers enrolment and shows a key to add to an authenticator app; after
-that it asks for a code. Privileged roles cannot proceed without one, so a
-password alone reaches nothing.
+That makes two accounts, both with the password `devpassword123`, and enrols a
+second factor for each:
 
-If you need a code without a phone:
+| Username | Role | Sees |
+| --- | --- | --- |
+| `demo-admin` | Platform admin | Organizations, investigations, audit, staff access |
+| `demo-release-manager` | Release manager | Products, batches, labels, activation, recall |
+
+Signing in takes two steps for both, because each is a privileged role. After
+the password, the portal asks for a six-digit code. Without an authenticator app
+to hand:
 
 ```bash
-.venv/bin/python -c "
-import os, django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE','config.settings')
-os.environ['DJANGO_DEBUG']='1'
-import sys; sys.path.insert(0,'backend'); django.setup()
-from apps.organizations.models import StaffMembership
-from apps.organizations import mfa
-m = StaffMembership.objects.filter(role='RELEASE_MANAGER').first()
-print(mfa.now_code(m.totp_secret))"
+make staff-code USER=demo-admin
 ```
+
+Codes rotate every 30 seconds, so fetch one immediately before entering it.
+
+The two accounts deliberately cannot do each other's work: an admin gets 403
+from the manufacturer endpoints, and a manufacturer gets 403 from the admin
+ones. Admin approves, suspends and investigates; it never acts as a
+manufacturer. If you want to see both workspaces, sign in as each in turn.
+
+`make staff` is also the fix if you are locked out: it resets the password and
+re-enrols the second factor on an existing account.
+
+Two accounts that look like they should work and do not:
+
+* `operator`, created by `make operator`, is a Django superuser for
+  <http://127.0.0.1:8000/admin/>. It has no staff membership, so the portal
+  refuses it with `NO_MEMBERSHIP`. The two are separate systems on purpose.
+* Any account without an enrolled second factor reaches the password step and
+  then nothing, because privileged roles cannot proceed without one.
 
 ## Running the landing page
 
@@ -254,6 +267,8 @@ on exactly the guarantees that matter most.
 | `make landing-csp` | Recomputes the landing page's CSP hashes after editing it |
 | `make backup` | Takes an encrypted database backup into `./backups` |
 | `make restore-drill` | Restores the newest backup in isolation and verifies it |
+| `make staff` | Creates or resets the two demo portal accounts |
+| `make staff-code USER=...` | Prints a current second-factor code |
 | `make down` | Stops PostgreSQL and Redis |
 
 `make restore-drill` is an acceptance test, not maintenance. It confirms that

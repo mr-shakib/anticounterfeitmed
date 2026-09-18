@@ -51,6 +51,13 @@ labels:  ## Generate the printable physical QR test sheet (80 labels)
 operator:  ## Create the local platform-operator admin account
 	DJANGO_DEBUG=1 $(PY) backend/manage.py createsuperuser
 
+staff:  ## Create the demo portal accounts (admin + release manager)
+	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-admin --role PLATFORM_ADMIN
+	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-release-manager --role RELEASE_MANAGER
+
+staff-code:  ## Print a current second-factor code: make staff-code USER=demo-admin
+	@DJANGO_DEBUG=1 $(PY) backend/manage.py staff_code $(USER)
+
 seed:  ## Seed demo data (development only)
 	DJANGO_DEBUG=1 $(PY) backend/manage.py seed_demo --count 3
 
