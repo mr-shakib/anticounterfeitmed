@@ -126,3 +126,16 @@ input, select, textarea {
 .center { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
 .auth-card { width: 100%; max-width: 380px; }
 code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+
+/* Generated labels. The QR box is sized in millimetres so what is on screen is
+   the physical size that will be printed, not an arbitrary preview. */
+.label-grid {
+  display: flex; flex-wrap: wrap; gap: 0.75rem;
+  margin: 0.75rem 0; padding: 0.75rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.label { margin: 0; text-align: center; }
+.label-qr { background: #fff; padding: 2px; border-radius: 2px; }
+.label-qr svg { width: 100%; height: 100%; display: block; }
+.label figcaption { font-size: 0.66rem; margin-top: 0.2rem; color: var(--muted); }

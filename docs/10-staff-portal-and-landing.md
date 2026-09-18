@@ -42,6 +42,20 @@ This is the SRS's compromise for the deferred factory end, and the UI must not m
 
 Rejected units are recorded as **VOID**; their labels are destroyed or quarantined and **new tokens generated for replacements**.
 
+### The codes are shown once, and that is load-bearing
+
+Only `SHA-256(token)` is stored, so the portal can display the QR codes at the
+moment it generates them and never again. That is not a missing feature: it is
+what stops anyone — including a platform operator with database access —
+reprinting a batch later. A label that is lost or damaged is handled by voiding
+those units and generating replacements, which leaves a record.
+
+The portal therefore renders the codes in the browser from the URLs in the
+generation response, and offers a print-ready sheet at the footprint chosen for
+the pilot. The CSV alongside it carries the references and URLs for
+reconciliation, or for a printer that renders codes from data itself; it cannot
+carry images.
+
 ### Off-system flow the portal supports
 
 1. Staff export generated QR labels + external human-readable unit references for printing outside the platform. **External references cannot redeem units.**

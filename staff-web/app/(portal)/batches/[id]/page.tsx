@@ -4,6 +4,7 @@ import { use, useCallback, useEffect, useState } from "react";
 import {
   ActivationJob, ApiError, Batch, LabelExport, Unit, api,
 } from "@/lib/api";
+import { LabelSheet } from "@/components/LabelSheet";
 import { useSession } from "@/components/Session";
 
 const STEPS = [
@@ -38,6 +39,7 @@ export default function BatchDetailPage({
 
   const [count, setCount] = useState("100");
   const [exported, setExported] = useState<LabelExport | null>(null);
+  const [labelSizeMm, setLabelSizeMm] = useState(20);
 
   const [step, setStep] = useState("PRINTED");
   const [completedAt, setCompletedAt] = useState("");
@@ -151,6 +153,9 @@ export default function BatchDetailPage({
 
   const downloadExport = () => {
     if (!exported) return;
+    // References and URLs, for reconciliation and for a printer that prefers
+    // to render the codes itself. The printable sheet is what carries the
+    // actual QR images.
     const rows = [
       "external_reference,qr_url",
       ...exported.label_export.map((e) => `${e.external_reference},${e.qr_url}`),
@@ -196,8 +201,14 @@ export default function BatchDetailPage({
       <h2>1 · Generate labels</h2>
       <div className="card">
         <p className="muted" style={{ marginTop: 0 }}>
-          One QR per strip. Printing happens outside this system; the export
+          One QR per strip. Printing happens outside this system; the sheet
           below is what you send to the printer.
+        </p>
+        <p className="muted">
+          <strong>The codes appear here once.</strong> Only a hash of each code
+          is stored, so they cannot be shown again after you leave this page —
+          that is what stops anyone, including us, reprinting a batch later. If
+          labels are lost or damaged, void those units and generate replacements.
         </p>
         <div className="row">
           <label>
@@ -215,9 +226,33 @@ export default function BatchDetailPage({
           <div className="alert info" style={{ marginTop: "1rem" }}>
             <strong>{exported.export_notice}</strong>
             <p style={{ margin: "0.5rem 0" }}>
-              {exported.label_export.length} label(s) ready.
+              {exported.label_export.length} label(s) generated. Print them now,
+              or save the sheet somewhere controlled.
             </p>
-            <button onClick={downloadExport}>Download CSV</button>
+
+            <div className="row" style={{ marginBottom: "0.75rem" }}>
+              <label style={{ maxWidth: 200 }}>
+                <span>Label footprint</span>
+                <select
+                  value={labelSizeMm}
+                  onChange={(e) => setLabelSizeMm(Number(e.target.value))}
+                >
+                  <option value={20}>20 mm</option>
+                  <option value={25}>25 mm</option>
+                </select>
+              </label>
+              <div className="shrink">
+                <button className="secondary" onClick={downloadExport}>
+                  Download CSV of references
+                </button>
+              </div>
+            </div>
+
+            <LabelSheet
+              entries={exported.label_export}
+              batchNumber={batch.batch_number}
+              sizeMm={labelSizeMm}
+            />
           </div>
         )}
       </div>
