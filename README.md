@@ -48,6 +48,21 @@ The signer is **pure Python** — verified on 2026-09-16 that `cryptography` 50.
 Building now: platform admin, manufacturer, consumer.
 Deferred, do not build: printing/QC end, pharmacy end, sale events, offline redemption, AI models, iOS.
 
+## Running it locally
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt -r requirements-dev.txt
+.venv/bin/pip install -e libs/medcrypto -e signer
+
+make up && make migrate && make seed
+make serve                       # http://127.0.0.1:8000
+cd staff-web && npm install && npm run dev   # http://localhost:3000
+```
+
+Full instructions, including the consumer app and the things that trip people
+up, are in **[docs/17 — Running locally](docs/17-running-locally.md)**.
+
 ## Getting started
 
 1. Read [docs/00-index.md](docs/00-index.md), then [docs/01](docs/01-scope-and-roles.md) and [docs/02](docs/02-architecture.md).

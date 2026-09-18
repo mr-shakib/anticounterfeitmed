@@ -24,6 +24,7 @@ The authoritative requirements document is [`Medicine_Verification_Implementatio
 | 14 | [Roadmap](14-roadmap.md) | Planning the next two weeks |
 | 15 | [Open decisions](15-open-decisions.md) | You are blocked on someone else's answer |
 | 16 | [Glossary](16-glossary.md) | A term is ambiguous |
+| 17 | [Running locally](17-running-locally.md) | **Getting the stack up on your own machine** |
 
 ## Brand
 
