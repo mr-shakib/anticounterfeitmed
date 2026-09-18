@@ -64,6 +64,9 @@ seed:  ## Seed demo data (development only)
 serve:  ## Run the backend, admin at http://127.0.0.1:8000/admin/
 	DJANGO_DEBUG=1 $(PY) backend/manage.py runserver 127.0.0.1:8000
 
+serve-nomfa:  ## Same, but without the staff second factor (DEBUG only)
+	DJANGO_DEBUG=1 STAFF_MFA_REQUIRED=0 $(PY) backend/manage.py runserver 127.0.0.1:8000
+
 apk:  ## Build the Android self-check APK into dist/
 	cd consumer-app && flutter build apk --release --target-platform=android-arm64
 	mkdir -p dist

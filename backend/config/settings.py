@@ -174,6 +174,12 @@ TRUST_MANIFEST_CACHE_SECONDS = int(env("TRUST_MANIFEST_CACHE_SECONDS", str(24 * 
 # at the isolated signer, which is the only component holding private keys.
 SIGNER_MODE = env("SIGNER_MODE", "local")  # "local" | "service"
 
+# --- staff second factor ----------------------------------------------------
+# Privileged roles normally require a TOTP second factor. Turning this off makes
+# local work less tedious and is refused outside DEBUG, so it cannot follow a
+# developer into a deployment.
+STAFF_MFA_REQUIRED = env_bool("STAFF_MFA_REQUIRED", True)
+
 # In-process signing is refused outside DEBUG. The test suite sets this
 # explicitly; nothing else should. It exists so the DEBUG guard stays strict
 # rather than being loosened to accommodate tests.

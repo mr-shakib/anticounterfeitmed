@@ -12,6 +12,8 @@ having completed it, not merely on the account having it enabled.
 
 from __future__ import annotations
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from rest_framework import permissions
 from rest_framework.authentication import SessionAuthentication
 
@@ -37,9 +39,30 @@ def membership_for(request) -> StaffMembership | None:
     )
 
 
+def staff_mfa_required() -> bool:
+    """Whether privileged roles must clear a second factor.
+
+    Always true in a deployment. It can be turned off for local work, and that
+    is refused outside DEBUG rather than quietly honoured, so the convenience
+    cannot follow someone into production.
+    """
+    if getattr(settings, "STAFF_MFA_REQUIRED", True):
+        return True
+    if not settings.DEBUG:
+        raise ImproperlyConfigured(
+            "STAFF_MFA_REQUIRED=0 disables the staff second factor and is not "
+            "permitted outside DEBUG. Privileged roles can release medicine "
+            "into circulation and suspend issuers; a password alone must not be "
+            "enough."
+        )
+    return False
+
+
 def session_mfa_ok(request, membership: StaffMembership) -> bool:
     """True when this session has cleared MFA for this membership."""
     if not membership.is_privileged:
+        return True
+    if not staff_mfa_required():
         return True
     if not membership.mfa_satisfied:
         return False

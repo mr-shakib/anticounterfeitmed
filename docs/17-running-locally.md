@@ -125,6 +125,24 @@ make staff-code USER=demo-admin
 
 Codes rotate every 30 seconds, so fetch one immediately before entering it.
 
+#### Skipping the code
+
+If entering a code every sign-in is tedious, run the backend without it:
+
+```bash
+make serve-nomfa          # DJANGO_DEBUG=1 STAFF_MFA_REQUIRED=0
+```
+
+The portal then goes straight in after the password, and accounts with no
+enrolled factor work too.
+
+This is refused outside `DEBUG`. Setting `STAFF_MFA_REQUIRED=0` on a deployed
+instance raises `ImproperlyConfigured` at the first sign-in rather than quietly
+accepting a password, because a release manager can put medicine into
+circulation and an admin can suspend an issuer — a password alone must not be
+enough there. The test suite keeps the requirement on, so the real two-step
+path stays covered.
+
 The two accounts deliberately cannot do each other's work: an admin gets 403
 from the manufacturer endpoints, and a manufacturer gets 403 from the admin
 ones. Admin approves, suspends and investigates; it never acts as a
@@ -269,6 +287,7 @@ on exactly the guarantees that matter most.
 | `make restore-drill` | Restores the newest backup in isolation and verifies it |
 | `make staff` | Creates or resets the two demo portal accounts |
 | `make staff-code USER=...` | Prints a current second-factor code |
+| `make serve-nomfa` | Runs the backend without the staff second factor (DEBUG only) |
 | `make down` | Stops PostgreSQL and Redis |
 
 `make restore-drill` is an acceptance test, not maintenance. It confirms that

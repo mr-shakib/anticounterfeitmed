@@ -28,6 +28,7 @@ from apps.organizations.permissions import (
     IsStaff,
     membership_for,
     session_mfa_ok,
+    staff_mfa_required,
 )
 
 
@@ -52,7 +53,9 @@ def _membership_payload(membership: StaffMembership, request) -> dict:
             "approval_status": membership.organization.approval_status,
             "is_suspended": membership.organization.is_suspended,
         },
-        "mfa_required": membership.is_privileged,
+        # False when the second factor is switched off for local work, so the
+        # portal goes straight in rather than asking for a code nothing checks.
+        "mfa_required": membership.is_privileged and staff_mfa_required(),
         "mfa_enrolled": membership.mfa_satisfied,
         "mfa_verified": session_mfa_ok(request, membership),
     }
