@@ -13,7 +13,7 @@
 set -euo pipefail
 
 TARGET="${1:?usage: deploy.sh user@host [api-domain]}"
-API_DOMAIN="${2:-api.anticounterfeitmed.com}"
+API_DOMAIN="${2:-api.pqc.anticounterfeitmed.com}"
 REMOTE_DIR="${REMOTE_DIR:-/opt/anticounterfeitmed}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
