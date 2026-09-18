@@ -20,6 +20,11 @@ class SigningService:
     def __init__(self, keystore: KeyStore) -> None:
         self._keystore = keystore
 
+    @property
+    def keystore(self) -> KeyStore:
+        """The store this service signs from. Used for provisioning new keys."""
+        return self._keystore
+
     def sign(self, *, key_id: str, context: str, payload: bytes) -> bytes:
         """Sign ``payload`` with ``key_id`` under ``context``.
 

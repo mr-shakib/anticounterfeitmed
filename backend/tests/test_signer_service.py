@@ -170,3 +170,49 @@ def test_signer_never_logs_a_payload(live_signer, signing_key, caplog):
         )
     assert "must-not-appear-in-logs" not in caplog.text
     assert base64.b64encode(payload).decode() not in caplog.text
+
+
+def test_keys_are_generated_inside_the_service(live_signer, tmp_path):
+    """The application must never hold a private seed, in any mode.
+
+    Generation happens in the signing service and only the public half comes
+    back, so a key cannot exist in a process that is supposed never to have one.
+    """
+    generated = client(live_signer).generate_key()
+
+    assert generated.key_id.startswith("mldsa65-")
+    assert len(generated.public_key) == 1952
+
+    # The returned key really is usable for verification, and the private half
+    # is only reachable by asking the service to sign.
+    payload = canonicalise({"schema": "medicine-activation-v1"})
+    signature = client(live_signer).sign(
+        key_id=generated.key_id,
+        context=Context.ACTIVATION.value.decode(),
+        payload=payload,
+    )
+    verify(generated.public_key, Context.ACTIVATION, payload, signature)
+
+
+def test_key_generation_requires_the_token(live_signer):
+    with pytest.raises(SignerUnavailable):
+        client(live_signer, token="wrong-token").generate_key()
+
+
+@pytest.mark.django_db
+def test_provisioning_records_only_the_public_half(live_signer, settings, monkeypatch):
+    """A provisioned key row must carry a reference, never key material."""
+    from apps.trust.models import KeyPurpose, SigningKey
+    from apps.trust.services import provision_signing_key
+
+    settings.SIGNER_MODE = "service"
+    settings.SIGNER_URL = live_signer
+    settings.SIGNER_AUTH_TOKEN = AUTH_TOKEN
+
+    key = provision_signing_key(purpose=KeyPurpose.STATUS)
+
+    stored = SigningKey.objects.get(pk=key.pk)
+    assert len(bytes(stored.public_key)) == 1952
+    assert stored.private_key_reference == f"keystore:{stored.key_id}"
+    # Nothing on the row is a 32-byte seed or anything like one.
+    assert "seed" not in stored.private_key_reference.lower()

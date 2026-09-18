@@ -21,7 +21,6 @@ from apps.trust.models import KeyPurpose, KeyState, SigningKey, TrustManifest
 from apps.trust.signing import get_signer
 from medcrypto import canonicalise
 from medcrypto.contexts import Context
-from medcrypto.keys import generate_keypair
 
 
 class NoUsableKey(Exception):
@@ -37,25 +36,24 @@ def provision_signing_key(
 ) -> SigningKey:
     """Generate a key pair, hand the seed to the signer, keep only the public key.
 
-    In development the seed is written to the local keystore directory. In a
-    deployed environment key generation happens inside the signing service and
-    this function records only the public half.
+    Generation happens inside the signing service in every mode, so no private
+    seed ever exists in this process. What is recorded here is the public key
+    and a reference to where the seed lives.
     """
     if purpose == KeyPurpose.ACTIVATION and organization is None:
         raise ValueError("activation keys must belong to a manufacturer")
 
-    pair = generate_keypair()
-
-    from medsigner import KeyStore
-
-    KeyStore(settings.SIGNER_KEYSTORE_PATH).store_seed(pair.key_id, pair.private_seed)
+    # Generated inside the signing service, which keeps the private seed. This
+    # process records only the public half and a reference; it never holds key
+    # material, in any mode.
+    generated = get_signer().generate_key()
 
     key = SigningKey.objects.create(
-        key_id=pair.key_id,
+        key_id=generated.key_id,
         purpose=purpose,
         organization=organization,
-        public_key=pair.public_key,
-        private_key_reference=f"keystore:{pair.key_id}",
+        public_key=generated.public_key,
+        private_key_reference=f"keystore:{generated.key_id}",
         state=KeyState.ACTIVE,
         valid_from=valid_from or timezone.now(),
     )

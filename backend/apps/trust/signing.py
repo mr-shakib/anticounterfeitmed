@@ -15,7 +15,7 @@ decision rather than a code change.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -25,8 +25,15 @@ class SignerUnavailable(Exception):
     """The signing service could not produce a signature."""
 
 
+class GeneratedKey(NamedTuple):
+    key_id: str
+    public_key: bytes
+
+
 class Signer(Protocol):
     def sign(self, *, key_id: str, context: str, payload: bytes) -> bytes: ...
+
+    def generate_key(self) -> GeneratedKey: ...
 
 
 class LocalSigner:
@@ -44,6 +51,13 @@ class LocalSigner:
             return self._service.sign(key_id=key_id, context=context, payload=payload)
         except (KeyNotAvailable, UnknownContext) as exc:
             raise SignerUnavailable(str(exc)) from exc
+
+    def generate_key(self) -> GeneratedKey:
+        from medcrypto.keys import generate_keypair
+
+        pair = generate_keypair()
+        self._service.keystore.store_seed(pair.key_id, pair.private_seed)
+        return GeneratedKey(key_id=pair.key_id, public_key=pair.public_key)
 
 
 class RemoteSigner:
@@ -101,6 +115,36 @@ class RemoteSigner:
             return base64.b64decode(response.json()["signature_b64"], validate=True)
         except Exception as exc:
             raise SignerUnavailable("signing service returned an unusable response") from exc
+
+    def generate_key(self) -> GeneratedKey:
+        """Ask the signing service to create a key and return its public half.
+
+        The seed is created and kept inside that service. This process never
+        sees one, which is the point of the separation.
+        """
+        import base64
+
+        import requests
+
+        try:
+            response = requests.post(
+                f"{self.url}/keys",
+                headers={"Authorization": f"Bearer {self._auth_token}"},
+                timeout=self.timeout_seconds,
+                verify=self._verify,
+            )
+        except requests.RequestException as exc:
+            raise SignerUnavailable(f"signing service unreachable: {exc}") from exc
+
+        if response.status_code != 200:
+            raise SignerUnavailable(
+                f"signing service refused key generation ({response.status_code})"
+            )
+        body = response.json()
+        return GeneratedKey(
+            key_id=body["key_id"],
+            public_key=base64.b64decode(body["public_key_b64"], validate=True),
+        )
 
 
 def get_signer() -> Signer:

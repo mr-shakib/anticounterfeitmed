@@ -44,6 +44,12 @@ class SignResponse(BaseModel):
     key_id: str
 
 
+class GenerateKeyResponse(BaseModel):
+    key_id: str
+    public_key_b64: str
+    algorithm: str
+
+
 def create_app(
     keystore_path: str | None = None,
     auth_token: str | None = None,
@@ -70,6 +76,31 @@ def create_app(
     def healthz() -> dict:
         # Deliberately says nothing about which keys are present.
         return {"status": "ok"}
+
+    @app.post("/keys", response_model=GenerateKeyResponse)
+    def generate_key(
+        request: Request,
+        authorization: str | None = Header(default=None),
+    ) -> GenerateKeyResponse:
+        """Create a key pair inside this service and return only its public half.
+
+        Generation belongs here rather than in the application: a key generated
+        elsewhere would exist, however briefly, in a process that is supposed
+        never to hold one. The private seed is written to the keystore and is
+        not returned, logged, or recoverable through this API.
+        """
+        _authorise(authorization)
+
+        from medcrypto.keys import ALGORITHM, generate_keypair
+
+        pair = generate_keypair()
+        service.keystore.store_seed(pair.key_id, pair.private_seed)
+        logger.info("generated key key_id=%s", pair.key_id)
+        return GenerateKeyResponse(
+            key_id=pair.key_id,
+            public_key_b64=base64.b64encode(pair.public_key).decode("ascii"),
+            algorithm=ALGORITHM,
+        )
 
     @app.post("/sign", response_model=SignResponse)
     def sign(

@@ -110,17 +110,20 @@ def test_invalid_session_credential_is_refused(client, active_package):
 def test_accept_any_attestation_refused_when_not_opted_in(client, settings):
     """Production must not silently accept debug tokens.
 
-    The misconfiguration fails closed and loudly rather than degrading to "no
-    attestation": a quiet 403 could be mistaken for a client problem, while this
-    names the cause.
+    The misconfiguration fails closed, and the response names the cause rather
+    than degrading to "no attestation". A quiet 403 could be mistaken for a
+    client problem; this cannot be.
     """
-    from django.core.exceptions import ImproperlyConfigured
-
     settings.APP_CHECK_ALLOW_INSECURE = False
     settings.DEBUG = False
 
-    with pytest.raises(ImproperlyConfigured, match="must not silently accept"):
-        client.post(reverse("consumer-sessions"), {}, format="json", **ATTEST)
+    response = client.post(reverse("consumer-sessions"), {}, format="json", **ATTEST)
+    assert response.status_code == 503
+    assert "must not silently accept" in str(response.data["detail"])
+
+    from apps.verification.models import ConsumerSession
+
+    assert not ConsumerSession.objects.exists(), "no session may be created"
 
 
 @pytest.mark.django_db(transaction=True)
@@ -367,3 +370,24 @@ def test_prepare_is_rate_limited_per_session(client, active_package, monkeypatch
     unit.refresh_from_db()
     assert unit.lifecycle == UnitLifecycle.ACTIVE
     cache.clear()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_unconfigured_attestation_reports_itself_clearly(client, settings):
+    """A server missing its Firebase settings must say so, not crash.
+
+    It still issues no session. The distinction matters to whoever is reading
+    logs at 2am: 503 with a named code is a service state, a 500 is a bug hunt,
+    and a 401 would wrongly blame the caller's token.
+    """
+    settings.APP_CHECK_MODE = "firebase"
+    settings.APP_CHECK_PROJECT_NUMBER = ""
+    settings.APP_CHECK_ALLOWED_APP_IDS = []
+
+    response = client.post(reverse("consumer-sessions"), {}, format="json", **ATTEST)
+    assert response.status_code == 503
+    assert response.data["detail"].code == "ATTESTATION_NOT_CONFIGURED"
+
+    from apps.verification.models import ConsumerSession
+
+    assert not ConsumerSession.objects.exists(), "no session may be created"
