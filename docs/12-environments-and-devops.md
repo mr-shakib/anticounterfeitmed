@@ -81,8 +81,20 @@ if it is missing or incomplete.
 `provision-keys.sh` refuses to run twice. Replacing a key that has already
 signed credentials would leave those credentials unverifiable.
 
-Add `infra/nginx/api-subdomain.conf` to the host's nginx, issue a certificate
-for the subdomain, and the API is reachable.
+Add `infra/nginx/api-subdomain.conf` to the host's nginx, then issue the
+certificate:
+
+```bash
+sudo cp infra/nginx/api-subdomain.conf /etc/nginx/sites-available/acm-api
+sudo ln -s /etc/nginx/sites-available/acm-api /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d api.pqc.anticounterfeitmed.com
+```
+
+The shipped block listens on port 80 only. `certbot --nginx` runs `nginx -t`
+before it does anything, so a block naming a certificate that does not exist yet
+prevents certbot from ever creating it. Certbot clones the block to 443 and adds
+the certificate itself, carrying the proxy settings with it.
 
 ### On hosting
 
