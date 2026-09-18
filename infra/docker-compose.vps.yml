@@ -1,0 +1,22 @@
+# Deploying alongside a web server that is already running on this host.
+#
+# The full production compose runs its own nginx on ports 80 and 443. On a VPS
+# that already serves a site, that either fails to bind or takes the site over.
+# This override instead publishes the API on the loopback interface only, and
+# leaves the host's existing nginx to terminate TLS and proxy to it.
+#
+# Nothing here is reachable from the internet except through that nginx, and the
+# signing service remains unreachable from anywhere but the API container.
+#
+# Usage:
+#   docker compose -f infra/docker-compose.prod.yml -f infra/docker-compose.vps.yml \
+#     --env-file infra/.env up -d
+services:
+  # Not used in this arrangement; the host's nginx does this job.
+  proxy:
+    profiles: ["unused"]
+
+  api:
+    # Loopback only. The host's nginx reaches it; the internet cannot.
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-8001}:8000"

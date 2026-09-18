@@ -56,6 +56,34 @@ Must run on every change:
 - The TLS endpoint terminates protection; **upstream connections need their own**.
 - Zero-downtime is not a pilot requirement. Correctness is.
 
+## Deploying to a VPS that already serves a site
+
+The production compose runs its own nginx on ports 80 and 443. On a host that is
+already serving something, that either fails to bind or takes the existing site
+over, so `infra/docker-compose.vps.yml` overrides it: the API is published on
+`127.0.0.1` only and the host's existing nginx proxies to it.
+
+The API goes on its own subdomain, `api.anticounterfeitmed.com`. Two reasons:
+the site at the root keeps working, and decision D17 — what serves `/` once QR
+codes are printed — stays open rather than being settled by a deployment script.
+The printed QR still points at the root domain; the app reaches the API through
+`BACKEND_BASE_URL`, so the two are independent.
+
+```bash
+./infra/deploy.sh user@host            # build, start, migrate
+./infra/provision-keys.sh user@host    # once: keys and the first manifest
+```
+
+`infra/.env` is never copied from a developer machine. It is created on the
+server and stays there, so secrets do not travel. The deploy refuses to continue
+if it is missing or incomplete.
+
+`provision-keys.sh` refuses to run twice. Replacing a key that has already
+signed credentials would leave those credentials unverifiable.
+
+Add `infra/nginx/api-subdomain.conf` to the host's nginx, issue a certificate
+for the subdomain, and the API is reachable.
+
 ### On hosting
 
 For `staging`, a managed platform (Railway or similar) is reasonable and fast to stand up. For `pilot`, prefer a container host where you control the database, backups, and the signer's network isolation — the signer's isolation and the PITR setup are the two things worth owning. Confirm any managed Postgres offers WAL archiving/PITR before relying on it.
