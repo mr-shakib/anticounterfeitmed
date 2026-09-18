@@ -34,17 +34,9 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <Image
-            src="/mark.png"
-            alt=""
-            width={40}
-            height={40}
-            priority
-          />
-          <div>
-            <strong>Anticounterfeit Med</strong>
-            <span className="muted">{membership.organization.name}</span>
-          </div>
+          <Image src="/mark.png" alt="" width={52} height={52} priority />
+          <strong>Anticounterfeit Med</strong>
+          <span className="muted">{membership.organization.name}</span>
         </div>
         <nav className="nav">
           <NavLink href="/" label="Overview" />
