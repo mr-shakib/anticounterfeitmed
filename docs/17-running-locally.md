@@ -288,6 +288,7 @@ on exactly the guarantees that matter most.
 | `make staff` | Creates or resets the two demo portal accounts |
 | `make staff-code USER=...` | Prints a current second-factor code |
 | `make serve-nomfa` | Runs the backend without the staff second factor (DEBUG only) |
+| `make stop` | Stops stray dev servers (backend, portal, signer) |
 | `make down` | Stops PostgreSQL and Redis |
 
 `make restore-drill` is an acceptance test, not maintenance. It confirms that
@@ -299,6 +300,10 @@ credentials still verify.
 
 **Connection refused everywhere.** PostgreSQL is not up yet, or stopped. `make
 up` waits for readiness; a bare `docker compose up -d` does not.
+
+**"That port is already in use."** A previous `make serve` is still running,
+often from another terminal. `make stop` clears the backend, the portal and the
+signer.
 
 **Every portal write returns 403 with a CSRF message.** Django checks the
 `Origin` header on cookie-authenticated writes. The portal's origin must be in
