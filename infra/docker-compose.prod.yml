@@ -89,6 +89,21 @@ services:
     networks: [internal]
     command: celery -A config beat -l info
 
+  portal:
+    build:
+      context: ..
+      dockerfile: staff-web/Dockerfile
+      args:
+        PORTAL_BASE_PATH: ${PORTAL_BASE_PATH:-/staff}
+    restart: unless-stopped
+    environment:
+      # Server-side rewrites reach the API over the private network; the
+      # browser reaches it same-origin through the host's nginx.
+      BACKEND_ORIGIN: http://api:8000
+    depends_on: [api]
+    networks: [internal, edge]
+    expose: ["3000"]
+
   proxy:
     image: nginx:alpine
     restart: unless-stopped

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anticounterfeit Med</title>
+<meta name="description" content="Post-quantum signed medicine verification. Choose where you are going.">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.png" type="image/png">
+<style>
+  :root {
+    --bg: #f6f8fa; --surface: #ffffff; --border: #d8dee7;
+    --text: #12181f; --muted: #5a6572;
+    --accent: #0b6b5e; --accent-text: #ffffff;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1419; --surface: #171e26; --border: #2b3742;
+      --text: #eef2f7; --muted: #9aa6b4;
+      --accent: #3fbfa8; --accent-text: #08201c;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+    line-height: 1.55; font-size: 16px;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 3rem 1rem 4rem; }
+  header { text-align: center; margin-bottom: 2.5rem; }
+  header img { width: 72px; height: 72px; display: block; margin: 0 auto .8rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .3rem; }
+  .tagline { color: var(--muted); margin: 0; }
+
+  .choices { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+  @media (min-width: 40rem) { .choices { grid-template-columns: 1fr 1fr; } }
+
+  .choice {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.3rem;
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .choice:hover { border-color: var(--accent); transform: translateY(-2px); text-decoration: none; }
+  .choice h2 { font-size: 1.1rem; margin: 0 0 .35rem; color: var(--accent); }
+  .choice p { margin: 0 0 .5rem; font-size: .95rem; }
+  .choice .who { font-size: .85rem; color: var(--muted); margin: 0; }
+  .choice .bn { font-size: .9rem; color: var(--muted); margin: .35rem 0 0; }
+
+  .note {
+    margin-top: 2.5rem; padding: 1rem 1.2rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: .92rem;
+  }
+  .note p { margin: 0 0 .5rem; }
+  .note p:last-child { margin-bottom: 0; }
+  footer {
+    margin-top: 2rem; text-align: center;
+    font-size: .85rem; color: var(--muted);
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="mark.png" width="72" height="72" alt="" decoding="async">
+    <h1>Anticounterfeit Med</h1>
+    <p class="tagline">Post-quantum signed medicine verification</p>
+  </header>
+
+  <div class="choices">
+
+    <a class="choice" href="/staff">
+      <h2>Staff portal &rarr;</h2>
+      <p>Maintain products and batches, generate labels, record manufacturing,
+         activate units, and publish recalls.</p>
+      <p class="who">For manufacturers and platform administrators. Sign-in required.</p>
+    </a>
+
+    <a class="choice" href="/app">
+      <h2>Consumer app &rarr;</h2>
+      <p>Scratch the coating on a strip, scan the code, and check it against the
+         manufacturer&rsquo;s signed record.</p>
+      <p class="who">For patients and pharmacies.</p>
+      <p class="bn">রোগী ও ফার্মেসির জন্য</p>
+    </a>
+
+  </div>
+
+  <div class="note">
+    <p><strong>What this service does.</strong> It checks whether a code on a
+       medicine strip matches a record its manufacturer signed, using ML-DSA
+       (FIPS&nbsp;204) post-quantum signatures.</p>
+    <p><strong>What it does not do.</strong> It does not test the contents of
+       the medicine, and a successful check is not proof that a package is
+       genuine or safe to take.</p>
+  </div>
+
+  <footer>
+    <p>A research project of RDG&ndash;ICSETEP, Daffodil International University.</p>
+  </footer>
+
+</div>
+</body>
+</html>

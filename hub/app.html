@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consumer app — Anticounterfeit Med</title>
+<meta name="description" content="Install the Anticounterfeit Med app to check a medicine package.">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="favicon.png" type="image/png">
+<style>
+  :root {
+    --bg: #f6f8fa; --surface: #ffffff; --border: #d8dee7;
+    --text: #12181f; --muted: #5a6572;
+    --accent: #0b6b5e; --accent-text: #ffffff;
+    --warn-bg: #fff8e6; --warn-border: #e8cf8a; --warn: #8a6100;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1419; --surface: #171e26; --border: #2b3742;
+      --text: #eef2f7; --muted: #9aa6b4;
+      --accent: #3fbfa8; --accent-text: #08201c;
+      --warn-bg: #2b2415; --warn-border: #5c4f2a; --warn: #e0b95a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+    line-height: 1.55; font-size: 16px;
+  }
+  .wrap { max-width: 34rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  header { margin-bottom: 1.5rem; }
+  header img { width: 56px; height: 56px; display: block; margin-bottom: .5rem; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  .bn { color: var(--muted); }
+  h2 { font-size: 1.05rem; margin: 1.8rem 0 .6rem; }
+  ol { padding-left: 1.2rem; margin: 0; }
+  li { margin-bottom: .9rem; }
+  li .bn { display: block; font-size: .93rem; margin-top: .15rem; }
+  .download {
+    display: inline-block; background: var(--accent); color: var(--accent-text);
+    padding: .8rem 1.3rem; border-radius: var(--radius);
+    text-decoration: none; font-weight: 600;
+  }
+  .download:hover { text-decoration: none; opacity: .92; }
+  .meta { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-border);
+    border-radius: var(--radius); padding: .9rem 1rem; margin: 1.5rem 0;
+    font-size: .93rem;
+  }
+  .note p { margin: 0 0 .4rem; }
+  .note p:last-child { margin-bottom: 0; }
+  footer {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+    font-size: .86rem; color: var(--muted);
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="mark.png" width="56" height="56" alt="" decoding="async">
+    <h1>Consumer app</h1>
+    <p class="bn">কনজিউমার অ্যাপ</p>
+  </header>
+
+  <p>Check whether the code on a medicine strip matches the record its
+     manufacturer signed.</p>
+  <p class="bn">ওষুধের স্ট্রিপের কোডটি প্রস্তুতকারকের স্বাক্ষরিত রেকর্ডের সঙ্গে
+     মেলে কি না তা যাচাই করুন।</p>
+
+  <h2>Install</h2>
+  <a class="download" href="/app/anticounterfeitmed.apk">Download for Android</a>
+  <p class="meta">Android 6.0 or later. Not yet on Google Play, so your phone
+     will ask you to allow installation from this site.</p>
+
+  <h2>How to use it / যেভাবে ব্যবহার করবেন</h2>
+  <ol>
+    <li>
+      Scratch off the silver coating over the QR code on the strip.
+      <span class="bn">স্ট্রিপের কিউআর কোডের উপরের রুপালি আবরণ ঘষে তুলুন।</span>
+    </li>
+    <li>
+      Open the app and scan the code from inside the app.
+      <span class="bn">অ্যাপটি খুলুন এবং অ্যাপের ভেতর থেকে কোডটি স্ক্যান করুন।</span>
+    </li>
+    <li>
+      Read the result, then tap to record your check.
+      <span class="bn">ফলাফল দেখুন, তারপর আপনার যাচাই নথিভুক্ত করতে ট্যাপ করুন।</span>
+    </li>
+  </ol>
+
+  <div class="note">
+    <p><strong>This checks the code&rsquo;s digital record; it does not test the
+       medicine&rsquo;s contents.</strong></p>
+    <p class="bn">এটি কোডের ডিজিটাল রেকর্ড যাচাই করে; এটি ওষুধের উপাদান পরীক্ষা
+       করে না।</p>
+  </div>
+
+  <footer>
+    <p><a href="/">&larr; Anticounterfeit Med</a></p>
+  </footer>
+
+</div>
+</body>
+</html>

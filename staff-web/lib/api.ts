@@ -24,6 +24,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Where the portal is mounted. Empty in development, "/staff" when deployed. */
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+/** Prefixes an API path with the mount point, so /v1/... resolves correctly. */
+function apiPath(path: string): string {
+  return `${BASE_PATH}${path}`;
+}
+
 function csrfToken(): string {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
@@ -41,7 +49,7 @@ async function request<T>(
     headers["X-CSRFToken"] = csrfToken();
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(apiPath(path), {
     method,
     headers,
     credentials: "include",
@@ -83,7 +91,7 @@ export const api = {
  */
 export async function primeCsrf(): Promise<void> {
   try {
-    await fetch("/v1/staff/me", { credentials: "include" });
+    await fetch(apiPath("/v1/staff/me"), { credentials: "include" });
   } catch {
     /* the caller will surface the real failure */
   }
