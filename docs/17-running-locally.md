@@ -128,10 +128,14 @@ make staff-code USER=demo-admin
 
 Codes rotate every 30 seconds, so fetch one immediately before entering it.
 
-Normally you do not need that command at all. `make staff` leaves the second
-factor unenrolled, so the first sign-in shows a QR code to scan into an
-authenticator app and you take codes from there afterwards. The command exists
-for automated runs and for accounts created with `--preenrol-mfa`.
+Normally you do not need that command at all. Signing in does not ask for a
+second factor unless one has been enrolled, and enrolment happens from
+**Settings** in the portal when someone chooses to set it up. `make staff`
+leaves it unenrolled.
+
+Once enrolled, a code is required at every sign-in. `STAFF_MFA_REQUIRED=1` goes
+further and makes enrolment a precondition for privileged roles — that is the
+pilot setting, and what docs/10 asks for.
 
 If an account ends up with a factor nobody holds — a secret generated for it
 that was never scanned — clear it and enrol again:

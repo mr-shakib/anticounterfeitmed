@@ -120,7 +120,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  password     : {options['password']}")
         if not membership.is_privileged:
             self.stdout.write("  second factor: not required for this role")
-        elif membership.mfa_satisfied:
+        elif membership.has_mfa:
             self.stdout.write(
                 f"  second factor: pre-enrolled — current code "
                 f"{mfa.now_code(membership.totp_secret)}"

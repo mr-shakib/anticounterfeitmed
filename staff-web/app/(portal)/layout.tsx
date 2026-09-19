@@ -40,6 +40,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="nav">
           <NavLink href="/" label="Overview" />
+          <NavLink href="/settings" label="Settings" />
 
           {!isAdmin && (
             <>

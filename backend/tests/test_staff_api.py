@@ -128,7 +128,11 @@ def test_anonymous_cannot_reach_staff_endpoints(make_manufacturer):
 
 @pytest.mark.django_db(transaction=True)
 def test_password_alone_does_not_grant_privileged_access(make_manufacturer):
-    """A stolen password must not be enough for a release manager."""
+    """Once a factor is enrolled, a stolen password is not enough.
+
+    This holds whatever the enrolment policy says: an enrolled factor is always
+    demanded, or enrolling would achieve nothing.
+    """
     actor = make_manufacturer("Alpha")
     client = APIClient()
     sign_in(client, actor, with_mfa=False)
@@ -514,8 +518,11 @@ def test_admin_can_reset_a_lost_second_factor(platform_admin, make_manufacturer)
 
 
 @pytest.mark.django_db(transaction=True)
-def test_resetting_the_factor_does_not_grant_access(platform_admin, make_manufacturer):
-    """After a reset the next sign-in must land in enrolment, not straight in."""
+def test_resetting_the_factor_does_not_grant_access(
+    platform_admin, make_manufacturer, settings
+):
+    """After a reset, a compulsory role lands in enrolment rather than straight in."""
+    settings.STAFF_MFA_REQUIRED = True
     target = make_manufacturer("Alpha")
     admin_client = APIClient()
     sign_in(admin_client, platform_admin)
@@ -531,8 +538,8 @@ def test_resetting_the_factor_does_not_grant_access(platform_admin, make_manufac
         format="json",
     )
     assert login.status_code == 200
-    assert login.data["mfa_required"] is True
     assert login.data["mfa_enrolled"] is False
+    assert login.data["mfa_enrolment_required"] is True
     # And the password-only session still reaches nothing.
     assert client.get(reverse("staff-products")).status_code == 403
 
@@ -650,16 +657,24 @@ def test_admin_can_block_a_unit_in_an_emergency(platform_admin, make_manufacture
     assert unit.is_blocked
 
 
-# --- the local second-factor bypass -----------------------------------------
+# --- enrolment policy -------------------------------------------------------
 
 
 @pytest.mark.django_db(transaction=True)
-def test_second_factor_can_be_skipped_for_local_work(make_manufacturer, settings):
-    """With the factor switched off, a password alone signs in."""
-    settings.DEBUG = True
+def test_signing_in_does_not_force_enrolment(make_manufacturer, settings):
+    """Without a factor, a privileged role still signs in and can work.
+
+    Enrolment happens from Settings when the owner chooses to, rather than being
+    pushed in front of them at the door.
+    """
     settings.STAFF_MFA_REQUIRED = False
 
     actor = make_manufacturer("Alpha")
+    actor["membership"].totp_secret = ""
+    actor["membership"].mfa_enabled = False
+    actor["membership"].mfa_confirmed_at = None
+    actor["membership"].save()
+
     client = APIClient()
     login = client.post(
         reverse("staff-login"),
@@ -667,16 +682,80 @@ def test_second_factor_can_be_skipped_for_local_work(make_manufacturer, settings
         format="json",
     )
     assert login.status_code == 200
-    # The portal reads this to decide whether to ask for a code.
     assert login.data["mfa_required"] is False
-
+    assert login.data["mfa_enrolment_required"] is False
     assert client.get(reverse("staff-products")).status_code == 200
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_bypass_works_without_an_enrolled_factor(make_manufacturer, settings):
-    """An account with no second factor is usable while the requirement is off."""
-    settings.DEBUG = True
+def test_an_enrolled_factor_is_always_demanded(make_manufacturer, settings):
+    """Even with enrolment optional, someone who enrolled must present a code."""
+    settings.STAFF_MFA_REQUIRED = False
+
+    actor = make_manufacturer("Alpha")  # fixture enrols a factor
+    client = APIClient()
+    login = client.post(
+        reverse("staff-login"),
+        {"username": actor["user"].get_username(), "password": PASSWORD},
+        format="json",
+    )
+    assert login.data["mfa_required"] is True
+    assert client.get(reverse("staff-products")).status_code == 403
+
+    code = mfa.now_code(actor["membership"].totp_secret)
+    assert client.post(
+        reverse("staff-mfa-verify"), {"code": code}, format="json"
+    ).status_code == 200
+    assert client.get(reverse("staff-products")).status_code == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_policy_can_make_enrolment_compulsory(make_manufacturer, settings):
+    """The pilot setting: a privileged role cannot work until it has enrolled."""
+    settings.STAFF_MFA_REQUIRED = True
+
+    actor = make_manufacturer("Alpha")
+    actor["membership"].totp_secret = ""
+    actor["membership"].mfa_enabled = False
+    actor["membership"].mfa_confirmed_at = None
+    actor["membership"].save()
+
+    client = APIClient()
+    login = client.post(
+        reverse("staff-login"),
+        {"username": actor["user"].get_username(), "password": PASSWORD},
+        format="json",
+    )
+    assert login.data["mfa_enrolment_required"] is True
+    assert client.get(reverse("staff-products")).status_code == 403
+
+
+@pytest.mark.django_db(transaction=True)
+def test_ordinary_staff_are_never_forced_to_enrol(make_manufacturer, settings):
+    """The obligation follows the role, not everyone."""
+    settings.STAFF_MFA_REQUIRED = True
+
+    actor = make_manufacturer("Alpha", role=StaffRole.MANUFACTURER_STAFF)
+    actor["membership"].totp_secret = ""
+    actor["membership"].mfa_enabled = False
+    actor["membership"].mfa_confirmed_at = None
+    actor["membership"].save()
+
+    client = APIClient()
+    login = client.post(
+        reverse("staff-login"),
+        {"username": actor["user"].get_username(), "password": PASSWORD},
+        format="json",
+    )
+    assert login.data["mfa_enrolment_required"] is False
+    assert client.get(reverse("staff-products")).status_code == 200
+
+
+# --- self-service enrolment and removal -------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_staff_can_enrol_and_remove_their_own_factor(make_manufacturer, settings):
     settings.STAFF_MFA_REQUIRED = False
 
     actor = make_manufacturer("Alpha")
@@ -691,48 +770,73 @@ def test_the_bypass_works_without_an_enrolled_factor(make_manufacturer, settings
         {"username": actor["user"].get_username(), "password": PASSWORD},
         format="json",
     )
-    assert client.get(reverse("staff-products")).status_code == 200
+
+    begun = client.post(reverse("staff-mfa-enroll"), {}, format="json")
+    assert begun.status_code == 200
+    secret = begun.data["secret"]
+    assert begun.data["provisioning_uri"].startswith("otpauth://")
+
+    confirmed = client.post(
+        reverse("staff-mfa-confirm"), {"code": mfa.now_code(secret)}, format="json"
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.data["mfa_enrolled"] is True
+
+    removed = client.post(
+        reverse("staff-mfa-disable"), {"code": mfa.now_code(secret)}, format="json"
+    )
+    assert removed.status_code == 200
+    assert removed.data["mfa_enrolled"] is False
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_bypass_is_refused_outside_debug(make_manufacturer, settings):
-    """The convenience must not be able to follow anyone into production.
-
-    A release manager can put medicine into circulation and an admin can suspend
-    an issuer, so a password alone must never be enough there. The
-    misconfiguration fails closed and names itself rather than degrading.
-    """
-    from django.core.exceptions import ImproperlyConfigured
-
-    settings.DEBUG = False
+def test_removing_a_factor_needs_a_current_code(make_manufacturer, settings):
+    """An unattended screen must not be enough to strip the protection off."""
     settings.STAFF_MFA_REQUIRED = False
 
     actor = make_manufacturer("Alpha")
     client = APIClient()
+    sign_in(client, actor)
 
-    # It fails at the first request that consults the setting, which is the
-    # login itself -- earlier than the protected endpoint, and better for it.
-    with pytest.raises(ImproperlyConfigured, match="not permitted outside DEBUG"):
-        client.post(
-            reverse("staff-login"),
-            {"username": actor["user"].get_username(), "password": PASSWORD},
-            format="json",
-        )
+    refused = client.post(reverse("staff-mfa-disable"), {"code": "000000"}, format="json")
+    assert refused.status_code == 400
+
+    actor["membership"].refresh_from_db()
+    assert actor["membership"].mfa_satisfied, "the factor must still be in place"
 
 
 @pytest.mark.django_db(transaction=True)
-def test_the_factor_is_still_required_by_default(make_manufacturer, settings):
-    """The default must stay on, including in this test suite."""
-    from apps.organizations.permissions import staff_mfa_required
-
-    assert staff_mfa_required() is True
+def test_a_compulsory_factor_cannot_be_removed_by_its_owner(make_manufacturer, settings):
+    """Where policy requires it, removal is an administrator action and audited."""
+    settings.STAFF_MFA_REQUIRED = True
 
     actor = make_manufacturer("Alpha")
     client = APIClient()
-    login = client.post(
-        reverse("staff-login"),
-        {"username": actor["user"].get_username(), "password": PASSWORD},
+    sign_in(client, actor)
+
+    refused = client.post(
+        reverse("staff-mfa-disable"),
+        {"code": mfa.now_code(actor["membership"].totp_secret)},
         format="json",
     )
-    assert login.data["mfa_required"] is True
-    assert client.get(reverse("staff-products")).status_code == 403
+    assert refused.status_code == 403
+    assert refused.data["code"] == "MFA_COMPULSORY"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_self_removal_is_audited(make_manufacturer, settings):
+    from apps.audit.models import AuditAction, AuditEvent
+
+    settings.STAFF_MFA_REQUIRED = False
+    actor = make_manufacturer("Alpha")
+    client = APIClient()
+    sign_in(client, actor)
+    client.post(
+        reverse("staff-mfa-disable"),
+        {"code": mfa.now_code(actor["membership"].totp_secret)},
+        format="json",
+    )
+
+    event = AuditEvent.objects.filter(action=AuditAction.STAFF_MFA_RESET).first()
+    assert event is not None
+    assert "removed their own" in event.reason

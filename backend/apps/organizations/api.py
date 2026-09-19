@@ -55,8 +55,11 @@ def _membership_payload(membership: StaffMembership, request) -> dict:
         },
         # False when the second factor is switched off for local work, so the
         # portal goes straight in rather than asking for a code nothing checks.
-        "mfa_required": membership.is_privileged and staff_mfa_required(),
-        "mfa_enrolled": membership.mfa_satisfied,
+        # Whether a code is needed right now: only when one is enrolled.
+        "mfa_required": membership.has_mfa,
+        # Whether enrolling is compulsory before this role can work.
+        "mfa_enrolment_required": membership.is_privileged and staff_mfa_required(),
+        "mfa_enrolled": membership.has_mfa,
         "mfa_verified": session_mfa_ok(request, membership),
     }
 
@@ -124,7 +127,7 @@ def mfa_enroll(request):
             {"code": "NOT_AUTHENTICATED", "detail": "Log in first."},
             status=status.HTTP_403_FORBIDDEN,
         )
-    if membership.mfa_satisfied:
+    if membership.has_mfa:
         return Response(
             {"code": "ALREADY_ENROLLED", "detail": "A second factor is already set."},
             status=status.HTTP_409_CONFLICT,
@@ -187,7 +190,7 @@ def mfa_verify(request):
     serializer = CodeSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
-    if not membership.mfa_satisfied:
+    if not membership.has_mfa:
         return Response(
             {"code": "NOT_ENROLLED", "detail": "Enrol a second factor first."},
             status=status.HTTP_409_CONFLICT,
@@ -199,6 +202,59 @@ def mfa_verify(request):
         )
 
     request.session[MFA_SESSION_KEY] = str(membership.id)
+    return Response(_membership_payload(membership, request))
+
+
+@api_view(["POST"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsStaff])
+def mfa_disable(request):
+    """Remove the caller's own second factor.
+
+    Requires a current code, so someone who has walked away from an unlocked
+    screen cannot quietly strip the protection off the account. Refused outright
+    when policy makes enrolment compulsory for the role -- the way out there is
+    an administrator reset, which is recorded.
+    """
+    membership = request.membership
+    if not membership.has_mfa:
+        return Response(
+            {"code": "NOT_ENROLLED", "detail": "No second factor is set."},
+            status=status.HTTP_409_CONFLICT,
+        )
+    if membership.is_privileged and staff_mfa_required():
+        return Response(
+            {
+                "code": "MFA_COMPULSORY",
+                "detail": (
+                    "This role requires a second factor. An administrator can "
+                    "reset it if the authenticator has been lost."
+                ),
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    serializer = CodeSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    if not mfa.verify_code(membership.totp_secret, serializer.validated_data["code"]):
+        return Response(
+            {"code": "INVALID_CODE", "detail": "That code did not match."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    membership.totp_secret = ""
+    membership.mfa_enabled = False
+    membership.mfa_confirmed_at = None
+    membership.save(update_fields=["totp_secret", "mfa_enabled", "mfa_confirmed_at"])
+    request.session.pop(MFA_SESSION_KEY, None)
+
+    AuditEvent.objects.create(
+        action=AuditAction.STAFF_MFA_RESET,
+        organization=membership.organization,
+        actor_user=request.user,
+        reason=f"{request.user.get_username()} removed their own second factor",
+        detail={"membership_id": str(membership.id), "action": "MFA_SELF_DISABLED"},
+    )
     return Response(_membership_payload(membership, request))
 
 
@@ -249,7 +305,7 @@ def list_memberships(request):
                 "role": m.role,
                 "is_enabled": m.is_enabled,
                 "mfa_required": m.is_privileged,
-                "mfa_enrolled": m.mfa_satisfied,
+                "mfa_enrolled": m.has_mfa,
             }
             for m in memberships
         ]

@@ -40,33 +40,33 @@ def membership_for(request) -> StaffMembership | None:
 
 
 def staff_mfa_required() -> bool:
-    """Whether privileged roles must clear a second factor.
+    """Whether a privileged role must hold a second factor to work at all.
 
-    Always true in a deployment. It can be turned off for local work, and that
-    is refused outside DEBUG rather than quietly honoured, so the convenience
-    cannot follow someone into production.
+    Off by default: staff enrol from their own settings, and someone who has not
+    enrolled can still sign in. Turning it on makes enrolment a precondition for
+    privileged work, which is what docs/10 asks for in a pilot -- a release
+    manager can put medicine into circulation and an admin can suspend an
+    issuer, and a password alone is thin protection for either.
+
+    This setting only governs whether enrolment is *compulsory*. A second factor
+    that someone has enrolled is always demanded at sign-in, regardless.
     """
-    if getattr(settings, "STAFF_MFA_REQUIRED", True):
-        return True
-    if not settings.DEBUG:
-        raise ImproperlyConfigured(
-            "STAFF_MFA_REQUIRED=0 disables the staff second factor and is not "
-            "permitted outside DEBUG. Privileged roles can release medicine "
-            "into circulation and suspend issuers; a password alone must not be "
-            "enough."
-        )
-    return False
+    return bool(getattr(settings, "STAFF_MFA_REQUIRED", False))
 
 
 def session_mfa_ok(request, membership: StaffMembership) -> bool:
-    """True when this session has cleared MFA for this membership."""
-    if not membership.is_privileged:
-        return True
-    if not staff_mfa_required():
-        return True
-    if not membership.mfa_satisfied:
-        return False
-    return str(request.session.get(MFA_SESSION_KEY, "")) == str(membership.id)
+    """True when this session may act for this membership.
+
+    Once someone has enrolled a second factor it is always required, whatever
+    the policy says. Anything else would make enrolling pointless: an attacker
+    with the password would simply not present a code.
+    """
+    if membership.has_mfa:
+        return str(request.session.get(MFA_SESSION_KEY, "")) == str(membership.id)
+
+    # No factor enrolled. Allowed unless policy makes enrolment compulsory for
+    # this role.
+    return not (membership.is_privileged and staff_mfa_required())
 
 
 class IsStaff(permissions.BasePermission):

@@ -119,11 +119,28 @@ class StaffMembership(models.Model):
         return self.role in (StaffRole.PLATFORM_ADMIN, StaffRole.RELEASE_MANAGER)
 
     @property
+    def has_mfa(self) -> bool:
+        """True when a second factor is actually enrolled on this account.
+
+        Distinct from meeting an obligation. Anyone may enrol one, and once they
+        have it is demanded at sign-in whatever the policy says -- so "is a
+        factor set up" and "is a factor required" have to be separate questions.
+        Conflating them made ordinary staff, who need no factor, look as though
+        they already had one.
+        """
+        return (
+            self.mfa_enabled
+            and bool(self.totp_secret)
+            and self.mfa_confirmed_at is not None
+        )
+
+    @property
     def mfa_satisfied(self) -> bool:
         """True when this membership meets its MFA obligation.
 
-        Ordinary staff are not forced into MFA; privileged roles are.
+        Ordinary staff carry no obligation; privileged roles do when the policy
+        requires it.
         """
         if not self.is_privileged:
             return True
-        return self.mfa_enabled and bool(self.totp_secret) and self.mfa_confirmed_at is not None
+        return self.has_mfa

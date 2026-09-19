@@ -19,13 +19,23 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  /** Decide where to send someone once a password has been accepted. */
+  /** Decide where to send someone once a password has been accepted.
+   *
+   * Enrolment is not forced here. Someone with a second factor is asked for a
+   * code; someone without one goes straight in and can enrol later from
+   * Settings. The exception is a role whose policy makes enrolment compulsory,
+   * where there is nothing useful to let them do until it is set up.
+   */
   function routeAfterPassword(me: Membership) {
-    if (!me.mfa_required) {
-      router.push("/");
+    if (me.mfa_enrolled) {
+      setStage("verify");
       return;
     }
-    setStage(me.mfa_enrolled ? "verify" : "enroll");
+    if (me.mfa_enrolment_required) {
+      setStage("enroll");
+      return;
+    }
+    router.push("/");
   }
 
   async function submitCredentials(event: React.FormEvent) {
@@ -119,8 +129,8 @@ export default function LoginPage() {
         {stage === "enroll" && (
           <>
             <div className="alert info">
-              This role can release medicine into circulation, so it requires a
-              second factor before it can be used.
+              This role can release medicine into circulation, so a second factor
+              is required before it can be used.
             </div>
             {!enrolment ? (
               <button onClick={beginEnrolment} disabled={busy}>

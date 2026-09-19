@@ -110,7 +110,10 @@ export type Membership = {
     approval_status: string;
     is_suspended: boolean;
   };
+  /** A code is needed now, because one is enrolled. */
   mfa_required: boolean;
+  /** Policy makes enrolling a precondition for this role. */
+  mfa_enrolment_required: boolean;
   mfa_enrolled: boolean;
   mfa_verified: boolean;
 };

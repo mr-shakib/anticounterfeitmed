@@ -50,6 +50,7 @@ staff_auth_patterns = [
     path("v1/staff/mfa/enroll", staff_api.mfa_enroll, name="staff-mfa-enroll"),
     path("v1/staff/mfa/confirm", staff_api.mfa_confirm, name="staff-mfa-confirm"),
     path("v1/staff/mfa/verify", staff_api.mfa_verify, name="staff-mfa-verify"),
+    path("v1/staff/mfa/disable", staff_api.mfa_disable, name="staff-mfa-disable"),
     path("v1/admin/memberships", staff_api.list_memberships, name="admin-memberships"),
     path(
         "v1/admin/memberships/<uuid:membership_id>/reset-mfa",

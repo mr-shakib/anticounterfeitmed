@@ -7,11 +7,28 @@ Source: SRS §2.2, §3.1, §3.2, §3.3.
 | Feature | Required behavior |
 | --- | --- |
 | Organization approval | Record manufacturer identity/contact and approved issuer-key association **before** allowing production issuance |
-| Access control | Organization-scoped roles; **MFA for privileged staff**; revoke when staff leave |
+| Access control | Organization-scoped roles; **MFA for privileged staff** (see below); revoke when staff leave |
 | Investigation queue | Filter by code-not-found reports, repeated checks, blocked units, recall reports, signing failures; assign cases; record findings |
 | Emergency restriction | Suspend an organization or block a unit with a reason. **Suspension overrides a normal verification result.** |
 | Audit viewer | Search by actor, organization, package, action, timestamp, request ID; export investigation evidence |
 | Operational dashboard | Failed print jobs, activation failures, API errors, unresolved reports, counts of first vs. repeated verifications |
+
+### Second factor: opt-in by default, compulsory by policy
+
+Staff enrol a second factor from Settings when they choose to; signing in does
+not push anyone through enrolment. Once enrolled it is always demanded at
+sign-in, whatever the policy says — otherwise enrolling would achieve nothing,
+since an attacker holding the password would simply not present a code.
+
+`STAFF_MFA_REQUIRED=1` makes enrolment a precondition for privileged roles, and
+that is what this document and the SRS ask for. **Set it before the pilot.** A
+release manager can put medicine into circulation and an admin can suspend an
+issuer; a password alone is thin protection for either, particularly one that
+has been reused elsewhere.
+
+Removing a factor needs a current code, so an unattended screen cannot be used
+to strip the protection off an account, and it is audited. Where policy makes it
+compulsory, removal is an administrator action instead.
 
 **Admin must not be able to:** edit signed product data, reset redeemed units to active, or routinely activate on a manufacturer's behalf. Investigations add a conclusion — they never erase history.
 
