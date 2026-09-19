@@ -103,6 +103,8 @@ services:
       dockerfile: staff-web/Dockerfile
       args:
         PORTAL_BASE_PATH: ${PORTAL_BASE_PATH:-/staff}
+        # Baked into the build; see staff-web/Dockerfile.
+        BACKEND_ORIGIN: ${PORTAL_BACKEND_ORIGIN:-http://api:8000}
     restart: unless-stopped
     environment:
       # Server-side rewrites reach the API over the private network; the

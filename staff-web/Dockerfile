@@ -9,6 +9,12 @@ COPY staff-web/ ./
 ARG PORTAL_BASE_PATH=/staff
 ENV PORTAL_BASE_PATH=${PORTAL_BASE_PATH}
 ENV NEXT_PUBLIC_BASE_PATH=${PORTAL_BASE_PATH}
+# Next.js writes rewrite destinations into routes-manifest.json at build time,
+# so this has to be known here and not only at runtime. Left unset, the build
+# freezes in the development default and the deployed portal proxies to its own
+# loopback, which fails with ECONNREFUSED and reads as a 500 on sign-in.
+ARG BACKEND_ORIGIN=http://api:8000
+ENV BACKEND_ORIGIN=${BACKEND_ORIGIN}
 RUN npm run build
 
 FROM node:24-alpine
