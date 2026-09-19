@@ -20,6 +20,14 @@ const nextConfig: NextConfig = {
   // The portal handles no package tokens, but the dependency discipline from
   // docs/07 applies here too: nothing third-party gets to observe staff traffic.
   poweredByHeader: false,
+
+  images: {
+    // The only images here are a small static mark. Next's optimiser builds its
+    // URLs without the base path, so under /staff it asks for /mark.png, which
+    // does not exist there, and the logo silently fails to render. Serving the
+    // file directly avoids that and costs nothing at this size.
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;

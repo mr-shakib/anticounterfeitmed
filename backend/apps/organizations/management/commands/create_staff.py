@@ -45,6 +45,25 @@ class Command(BaseCommand):
             default=None,
             help="Organization name. Defaults to a sensible one for the role.",
         )
+        parser.add_argument(
+            "--reset-mfa",
+            action="store_true",
+            help=(
+                "Clear any existing second factor so the next sign-in enrols a "
+                "new one. The way out of holding an account whose secret nobody "
+                "has, when you cannot reach the administrator reset because you "
+                "cannot sign in."
+            ),
+        )
+        parser.add_argument(
+            "--preenrol-mfa",
+            action="store_true",
+            help=(
+                "Generate the second factor here instead of letting the person "
+                "enrol it. Useful for automated tests; normally you want the "
+                "portal to show a QR the owner can actually scan."
+            ),
+        )
 
     def handle(self, *args, **options):
         if not settings.DEBUG:
@@ -77,9 +96,17 @@ class Command(BaseCommand):
         membership.role = role
         membership.is_enabled = True
 
-        # Privileged roles cannot sign in without a second factor, so enrol one
-        # rather than leaving the account in a state that refuses every action.
-        if membership.is_privileged:
+        # By default the second factor is left unenrolled, so the first sign-in
+        # walks the owner through enrolment and shows a code they can scan into
+        # an authenticator app. Generating it here instead produces a secret
+        # nobody holds, and an account that asks for codes that cannot be
+        # produced.
+        if options["reset_mfa"]:
+            membership.totp_secret = ""
+            membership.mfa_enabled = False
+            membership.mfa_confirmed_at = None
+
+        if options["preenrol_mfa"] and membership.is_privileged:
             membership.totp_secret = membership.totp_secret or mfa.new_secret()
             membership.mfa_enabled = True
             membership.mfa_confirmed_at = timezone.now()
@@ -91,12 +118,19 @@ class Command(BaseCommand):
         self.stdout.write(f"  organization : {organization.name}")
         self.stdout.write(f"  role         : {role}")
         self.stdout.write(f"  password     : {options['password']}")
-        if membership.is_privileged:
+        if not membership.is_privileged:
+            self.stdout.write("  second factor: not required for this role")
+        elif membership.mfa_satisfied:
             self.stdout.write(
-                f"  second factor: enrolled — current code "
+                f"  second factor: pre-enrolled — current code "
                 f"{mfa.now_code(membership.totp_secret)}"
             )
             self.stdout.write(
-                "  (codes rotate every 30s; run "
-                "`make staff-code USER=%s` for a fresh one)" % user.get_username()
+                "  (run `make staff-code USER=%s` for a fresh one)"
+                % user.get_username()
+            )
+        else:
+            self.stdout.write(
+                "  second factor: not enrolled — the first sign-in will show a "
+                "QR code to scan into an authenticator app"
             )

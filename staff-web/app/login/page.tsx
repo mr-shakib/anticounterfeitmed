@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import QRCode from "qrcode";
 import { ApiError, Membership, api, primeCsrf } from "@/lib/api";
 
 type Stage = "credentials" | "verify" | "enroll";
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [enrolment, setEnrolment] = useState<{ secret: string; uri: string } | null>(null);
+  const [enrolmentQr, setEnrolmentQr] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -49,6 +51,11 @@ export default function LoginPage() {
         "/v1/staff/mfa/enroll",
       );
       setEnrolment({ secret: data.secret, uri: data.provisioning_uri });
+      // Rendered here rather than fetched: the provisioning URI contains the
+      // shared secret, so it must not travel to an image service.
+      setEnrolmentQr(
+        await QRCode.toDataURL(data.provisioning_uri, { margin: 2, width: 220 }),
+      );
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not start enrolment.");
     } finally {
@@ -122,11 +129,36 @@ export default function LoginPage() {
             ) : (
               <>
                 <p className="muted">
-                  Add this key to an authenticator app, then enter the code it
-                  shows. The key is displayed once.
+                  Scan this with an authenticator app — Google Authenticator,
+                  Authy, 1Password, or any other — then enter the six-digit code
+                  it shows.
                 </p>
-                <p className="mono" style={{ wordBreak: "break-all" }}>
-                  {enrolment.secret}
+                {enrolmentQr && (
+                  <img
+                    src={enrolmentQr}
+                    alt="Authenticator setup code"
+                    width={220}
+                    height={220}
+                    style={{
+                      display: "block",
+                      margin: "0 auto 0.75rem",
+                      background: "#fff",
+                      padding: 8,
+                      borderRadius: 8,
+                    }}
+                  />
+                )}
+                <details style={{ marginBottom: "0.75rem" }}>
+                  <summary className="muted" style={{ cursor: "pointer" }}>
+                    Can&rsquo;t scan? Enter the key by hand
+                  </summary>
+                  <p className="mono" style={{ wordBreak: "break-all", marginTop: "0.5rem" }}>
+                    {enrolment.secret}
+                  </p>
+                </details>
+                <p className="muted" style={{ fontSize: "0.85rem" }}>
+                  This is shown once. If you lose the authenticator, an
+                  administrator can reset it for you.
                 </p>
                 <form onSubmit={submitCode}>
                   <label>

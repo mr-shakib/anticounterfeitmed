@@ -48,6 +48,9 @@ staff:  ## Create or reset the three demo portal accounts, one per role
 	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-release-manager --role RELEASE_MANAGER
 	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff demo-staff --role MANUFACTURER_STAFF
 
+staff-reset-mfa:  ## Clear a second factor so it can be re-enrolled: make staff-reset-mfa USER=demo-admin
+	DJANGO_DEBUG=1 $(PY) backend/manage.py create_staff $(USER) --reset-mfa
+
 staff-code:  ## Print a second-factor code: make staff-code USER=demo-admin
 	@DJANGO_DEBUG=1 $(PY) backend/manage.py staff_code $(USER)
 

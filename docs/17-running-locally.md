@@ -128,6 +128,21 @@ make staff-code USER=demo-admin
 
 Codes rotate every 30 seconds, so fetch one immediately before entering it.
 
+Normally you do not need that command at all. `make staff` leaves the second
+factor unenrolled, so the first sign-in shows a QR code to scan into an
+authenticator app and you take codes from there afterwards. The command exists
+for automated runs and for accounts created with `--preenrol-mfa`.
+
+If an account ends up with a factor nobody holds — a secret generated for it
+that was never scanned — clear it and enrol again:
+
+```bash
+make staff-reset-mfa USER=demo-admin
+```
+
+An administrator can do the same from Staff access in the portal. The command is
+the way out when the account locked out is the only administrator.
+
 #### Skipping the code
 
 If entering a code every sign-in is tedious, run the backend without it:
@@ -290,6 +305,7 @@ on exactly the guarantees that matter most.
 | `make restore-drill` | Restores the newest backup in isolation and verifies it |
 | `make staff` | Creates or resets the two demo portal accounts |
 | `make staff-code USER=...` | Prints a current second-factor code |
+| `make staff-reset-mfa USER=...` | Clears a second factor so it can be re-enrolled |
 | `make serve-nomfa` | Runs the backend without the staff second factor (DEBUG only) |
 | `make stop` | Stops stray dev servers (backend, portal, signer) |
 | `make down` | Stops PostgreSQL and Redis |
