@@ -2,9 +2,9 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import {
-  ActivationJob, ApiError, Batch, LabelExport, Unit, api,
+  ActivationJob, ApiError, Batch, LabelExport, PrintJob, Unit, api,
 } from "@/lib/api";
-import { LabelSheet } from "@/components/LabelSheet";
+import { LabelSheet, LABEL_SIZES_MM } from "@/components/LabelSheet";
 import { useSession } from "@/components/Session";
 
 const STEPS = [
@@ -47,6 +47,7 @@ export default function BatchDetailPage({
 
   const [job, setJob] = useState<ActivationJob | null>(null);
   const [recallNotice, setRecallNotice] = useState("");
+  const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -59,6 +60,7 @@ export default function BatchDetailPage({
       setBatch(b);
       setCounts(u.counts_by_lifecycle);
       setUnits(u.units);
+      setPrintJobs(await api.get<PrintJob[]>(`/v1/staff/batches/${id}/print-jobs`));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not load the batch.");
     }
@@ -88,6 +90,35 @@ export default function BatchDetailPage({
       });
       setExported(result);
     });
+
+  const reopenExport = (printJobId: string) =>
+    run(async () => {
+      const result = await api.get<LabelExport>(
+        `/v1/staff/print-jobs/${printJobId}/export`,
+      );
+      setExported(result);
+      setNotice("Labels reopened. They remain available until the date shown.");
+    });
+
+  const reconcile = (printJob: PrintJob) => {
+    const printed = window.prompt(
+      `How many of the ${printJob.issued_count} labels were printed?`,
+      String(printJob.issued_count),
+    );
+    if (printed === null) return;
+    const rejected = window.prompt("How many were rejected or destroyed?", "0");
+    if (rejected === null) return;
+    void run(async () => {
+      await api.post(`/v1/staff/print-jobs/${printJob.id}/reconcile`, {
+        printed: Number(printed),
+        rejected: Number(rejected),
+      });
+      setNotice(
+        "Reconciled. The stored labels will be deleted within 24 hours; " +
+          "download them now if you still need them.",
+      );
+    });
+  };
 
   const recordStep = () =>
     run(async () => {
@@ -205,10 +236,11 @@ export default function BatchDetailPage({
           below is what you send to the printer.
         </p>
         <p className="muted">
-          <strong>The codes appear here once.</strong> Only a hash of each code
-          is stored, so they cannot be shown again after you leave this page —
-          that is what stops anyone, including us, reprinting a batch later. If
-          labels are lost or damaged, void those units and generate replacements.
+          The codes stay available from <em>Label runs</em> below until you
+          reconcile the job, and for 24 hours after that. Only a hash of each
+          code is kept permanently, so once the export is deleted the codes
+          cannot be recovered — replacing lost labels then means voiding those
+          units and issuing new ones, which leaves a record.
         </p>
         <div className="row">
           <label>
@@ -237,8 +269,11 @@ export default function BatchDetailPage({
                   value={labelSizeMm}
                   onChange={(e) => setLabelSizeMm(Number(e.target.value))}
                 >
-                  <option value={20}>20 mm</option>
-                  <option value={25}>25 mm</option>
+                  {LABEL_SIZES_MM.map((mm) => (
+                    <option key={mm} value={mm}>
+                      {mm} mm
+                    </option>
+                  ))}
                 </select>
               </label>
               <div className="shrink">
@@ -254,6 +289,67 @@ export default function BatchDetailPage({
               sizeMm={labelSizeMm}
             />
           </div>
+        )}
+      </div>
+
+      <h2>Label runs</h2>
+      <div className="card">
+        {printJobs.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            No labels generated for this batch yet.
+          </p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Generated</th><th>Units</th><th>Status</th>
+                <th>Labels</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {printJobs.map((p) => (
+                <tr key={p.id}>
+                  <td className="muted">
+                    {new Date(p.created_at).toLocaleString()}
+                  </td>
+                  <td>{p.issued_count}</td>
+                  <td>
+                    <span className="badge">{p.status.toLowerCase()}</span>
+                  </td>
+                  <td className="muted">
+                    {p.export_available ? (
+                      <>
+                        available until{" "}
+                        {p.export_expires_at
+                          ? new Date(p.export_expires_at).toLocaleDateString()
+                          : "—"}
+                      </>
+                    ) : (
+                      <span className="badge danger">deleted</span>
+                    )}
+                  </td>
+                  <td>
+                    {p.export_available && (
+                      <>
+                        <button onClick={() => reopenExport(p.id)} disabled={busy}>
+                          Show labels
+                        </button>{" "}
+                      </>
+                    )}
+                    {!p.reconciled_at && (
+                      <button
+                        className="secondary"
+                        onClick={() => reconcile(p)}
+                        disabled={busy}
+                      >
+                        Reconcile
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 

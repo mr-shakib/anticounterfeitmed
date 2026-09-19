@@ -59,19 +59,38 @@ This is the SRS's compromise for the deferred factory end, and the UI must not m
 
 Rejected units are recorded as **VOID**; their labels are destroyed or quarantined and **new tokens generated for replacements**.
 
-### The codes are shown once, and that is load-bearing
+### Label runs, and how long the codes last
 
-Only `SHA-256(token)` is stored, so the portal can display the QR codes at the
-moment it generates them and never again. That is not a missing feature: it is
-what stops anyone — including a platform operator with database access —
-reprinting a batch later. A label that is lost or damaged is handled by voiding
-those units and generating replacements, which leaves a record.
+Only `SHA-256(token)` is kept permanently, so the codes cannot be recovered from
+the database. But discarding them the moment a page closes is not what the SRS
+asks for either: it keeps encrypted print artifacts until a job is reconciled
+and deletes them within 24 hours.
 
-The portal therefore renders the codes in the browser from the URLs in the
-generation response, and offers a print-ready sheet at the footprint chosen for
-the pilot. The CSV alongside it carries the references and URLs for
-reconciliation, or for a printer that renders codes from data itself; it cannot
-carry images.
+So a print job retains its export, encrypted, and the batch page lists its runs
+with the labels still attached. A manufacturer who navigates away, or comes back
+the next morning, can open the codes again. Reconciling the job — recording how
+many were printed and how many rejected — shortens the retention to the grace
+period, because once quantities are agreed there is no further reason to hold
+raw tokens. A job that is never reconciled expires at a longer ceiling rather
+than keeping them indefinitely.
+
+Once the export is deleted the codes are gone, and replacing lost labels means
+voiding those units and issuing new ones, which leaves a record. Deletion is
+recorded on the job, so disposal of an artifact holding raw tokens is visible.
+
+The codes are rendered in the browser and offered three ways: printed straight
+away, downloaded as a self-contained HTML sheet, or downloaded as a ZIP of one
+SVG per unit for label software. The CSV alongside them carries references and
+URLs for reconciliation; it cannot carry images.
+
+### Footprint and whether a label can actually be read
+
+The printed URL fixes the symbol at 53 modules across including the quiet zone,
+so the footprint alone decides how wide a module is. The portal shows that figure
+as the size is chosen, because the smaller options cannot work: at 5 mm a module
+is 0.094 mm, far below what a phone camera resolves, and a run printed at that
+size would be unreadable. Sizes from 15 mm are usable, 20 mm and above
+comfortably so.
 
 ### Off-system flow the portal supports
 

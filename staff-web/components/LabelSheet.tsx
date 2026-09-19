@@ -22,6 +22,40 @@ export type LabelEntry = { external_reference: string; qr_url: string };
 const EC_LEVEL = "Q" as const;
 const QUIET_ZONE_MODULES = 4;
 
+/** Footprints offered, in millimetres. */
+export const LABEL_SIZES_MM = [5, 8, 10, 12, 15, 20, 25] as const;
+
+/**
+ * How wide one module is at a given footprint, and whether that can be read.
+ *
+ * The URL fixes the symbol at 53 modules across including the quiet zone, so
+ * the footprint alone decides the module size. Below roughly a third of a
+ * millimetre a phone camera struggles, and through a scratched coating it stops
+ * working altogether -- which is worth knowing before a press run rather than
+ * after one.
+ */
+export function moduleAdvice(sizeMm: number, modules = 53) {
+  const mm = sizeMm / modules;
+  if (mm >= 0.33) return { mm, level: "ok" as const, note: "Readable." };
+  if (mm >= 0.25)
+    return {
+      mm,
+      level: "warn" as const,
+      note: "Marginal. Test on the real packaging, after scratching, before committing to a run.",
+    };
+  if (mm >= 0.2)
+    return {
+      mm,
+      level: "bad" as const,
+      note: "Very likely to fail once the coating has been scratched.",
+    };
+  return {
+    mm,
+    level: "bad" as const,
+    note: "Below what a phone camera can resolve. These labels will not scan.",
+  };
+}
+
 /** How many to draw on screen. A full run can be thousands; the sheet has all. */
 const PREVIEW_LIMIT = 12;
 
@@ -76,11 +110,24 @@ export function LabelSheet({
           contains all {entries.length}.
         </p>
       )}
-      <p className="muted">
-        {sizeMm}&nbsp;mm footprint including the quiet zone, error correction{" "}
-        {EC_LEVEL}. Print at 100% scale with no fitting, on the real packaging
-        material, and measure one label before running the job.
-      </p>
+      {(() => {
+        const advice = moduleAdvice(sizeMm);
+        return (
+          <div
+            className={`alert ${advice.level === "ok" ? "success" : advice.level === "warn" ? "info" : "error"}`}
+          >
+            <strong>
+              {sizeMm}&nbsp;mm footprint &rarr; {advice.mm.toFixed(3)}&nbsp;mm per module
+            </strong>
+            <p style={{ margin: "0.25rem 0 0" }}>{advice.note}</p>
+            <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem" }}>
+              Includes the quiet zone, error correction {EC_LEVEL}. Print at 100%
+              scale with no fitting, on the real packaging material, and measure
+              one label before running the job.
+            </p>
+          </div>
+        );
+      })()}
       <div className="row" style={{ gap: "0.5rem" }}>
         <div className="shrink">
           <button onClick={() => openPrintableSheet(entries, batchNumber, sizeMm)}>

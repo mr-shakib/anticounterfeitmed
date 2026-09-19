@@ -71,6 +71,20 @@ class PrintJob(models.Model):
     )
 
     export_object_key = models.CharField(max_length=500, blank=True)
+
+    #: The label export, encrypted at rest.
+    #:
+    #: The SRS keeps encrypted print artifacts until a job is reconciled and
+    #: then deletes them within 24 hours. That is what this is: it lets a
+    #: manufacturer come back for the codes they have not printed yet, without
+    #: keeping raw tokens indefinitely. The plaintext never enters another
+    #: column, and the ciphertext is removed on the schedule below.
+    export_ciphertext = models.BinaryField(null=True, blank=True)
+
+    #: When the export stops being retrievable. Set on creation to a maximum
+    #: lifetime, and shortened to 24 hours when the job is reconciled.
+    export_expires_at = models.DateTimeField(null=True, blank=True)
+
     export_deleted_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -90,6 +104,15 @@ class PrintJob(models.Model):
 
     def __str__(self) -> str:
         return f"Print job {self.id} for {self.batch}"
+
+    def export_available(self, now) -> bool:
+        """Whether the labels can still be retrieved."""
+        return bool(
+            self.export_ciphertext
+            and self.export_expires_at
+            and self.export_expires_at > now
+            and self.export_deleted_at is None
+        )
 
 
 class PackageUnit(models.Model):

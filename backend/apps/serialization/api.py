@@ -19,17 +19,32 @@ from rest_framework.response import Response
 from apps.catalog.models import Batch
 from apps.organizations.permissions import STAFF_AUTH, IsManufacturerStaff, owns
 from apps.serialization.models import PackageUnit, PrintJob
-from apps.serialization.services import IssuanceNotPermitted, create_print_job
+from apps.serialization.export_store import ExportUnavailable, decrypt_export
+from apps.serialization.services import (
+    IssuanceNotPermitted,
+    create_print_job,
+    reconcile_print_job,
+)
 
 
 class PrintJobSerializer(serializers.ModelSerializer):
+    export_available = serializers.SerializerMethodField()
+    export_expires_at = serializers.DateTimeField(read_only=True)
+
     class Meta:
         model = PrintJob
         fields = [
             "id", "batch", "planned_count", "issued_count", "status",
-            "reconciled_at", "reconciled_printed", "reconciled_rejected", "created_at",
+            "reconciled_at", "reconciled_printed", "reconciled_rejected",
+            "export_available", "export_expires_at", "export_deleted_at",
+            "created_at",
         ]
         read_only_fields = fields
+
+    def get_export_available(self, job: PrintJob) -> bool:
+        from django.utils import timezone
+
+        return job.export_available(timezone.now())
 
 
 class UnitSerializer(serializers.ModelSerializer):
@@ -129,3 +144,115 @@ def batch_units(request, batch_id):
             "units": UnitSerializer(queryset[:500], many=True).data,
         }
     )
+
+
+@api_view(["GET"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsManufacturerStaff])
+def batch_print_jobs(request, batch_id):
+    """The print jobs for a batch, and whether their labels can still be had."""
+    batch = (
+        Batch.objects.select_related("product__manufacturer").filter(pk=batch_id).first()
+    )
+    if batch is None or not owns(request.membership, batch.product.manufacturer):
+        return Response(
+            {"code": "NOT_FOUND", "detail": "No such batch."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    jobs = PrintJob.objects.filter(batch=batch).order_by("-created_at")
+    return Response(PrintJobSerializer(jobs, many=True).data)
+
+
+@api_view(["GET"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsManufacturerStaff])
+def print_job_export(request, job_id):
+    """Return a retained label export.
+
+    Available until the job is reconciled, and for a short grace period after.
+    Once that passes the export is deleted and the labels cannot be recovered:
+    replacing lost labels means voiding those units and issuing new ones, which
+    leaves a record.
+    """
+    from django.utils import timezone
+
+    job = (
+        PrintJob.objects.select_related("batch__product__manufacturer", "manufacturer")
+        .filter(pk=job_id)
+        .first()
+    )
+    if job is None or not owns(request.membership, job.manufacturer):
+        return Response(
+            {"code": "NOT_FOUND", "detail": "No such print job."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    now = timezone.now()
+    if not job.export_available(now):
+        return Response(
+            {
+                "code": "EXPORT_UNAVAILABLE",
+                "detail": (
+                    "The labels for this job are no longer retrievable. Void the "
+                    "affected units and issue replacements."
+                ),
+                "expired_at": job.export_expires_at,
+                "deleted_at": job.export_deleted_at,
+            },
+            status=status.HTTP_410_GONE,
+        )
+
+    try:
+        labels = decrypt_export(job.export_ciphertext)
+    except ExportUnavailable as exc:
+        return Response(
+            {"code": "EXPORT_UNAVAILABLE", "detail": str(exc)},
+            status=status.HTTP_410_GONE,
+        )
+
+    return Response(
+        {
+            "print_job": PrintJobSerializer(job).data,
+            "label_export": [
+                {
+                    "external_reference": entry["external_reference"],
+                    "qr_url": f"https://anticounterfeitmed.com/#v=1&t={entry['token']}",
+                }
+                for entry in labels
+            ],
+            "export_notice": (
+                "Retrievable until "
+                f"{job.export_expires_at:%Y-%m-%d %H:%M} UTC, then deleted. "
+                "Keep it under the same controls as the printed labels."
+            ),
+        }
+    )
+
+
+class ReconcileSerializer(serializers.Serializer):
+    printed = serializers.IntegerField(min_value=0)
+    rejected = serializers.IntegerField(min_value=0)
+
+
+@api_view(["POST"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsManufacturerStaff])
+def reconcile_job(request, job_id):
+    """Record printed and rejected counts, which starts the export's deletion clock."""
+    serializer = ReconcileSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    job = PrintJob.objects.select_related("manufacturer").filter(pk=job_id).first()
+    if job is None or not owns(request.membership, job.manufacturer):
+        return Response(
+            {"code": "NOT_FOUND", "detail": "No such print job."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    reconcile_print_job(
+        job=job,
+        printed=serializer.validated_data["printed"],
+        rejected=serializer.validated_data["rejected"],
+        actor_description=request.user.get_username(),
+    )
+    return Response(PrintJobSerializer(job).data)

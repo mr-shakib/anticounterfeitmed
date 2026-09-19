@@ -162,6 +162,21 @@ APP_CHECK_ALLOWED_APP_IDS = [
     a for a in os.environ.get("APP_CHECK_ALLOWED_APP_IDS", "").split(",") if a
 ]
 
+# --- label exports ----------------------------------------------------------
+# Retained label exports are encrypted with this key. Left unset, one is derived
+# from SECRET_KEY, which is fine for development. Exports are short-lived either
+# way, so rotating a key costs at most a reissue.
+PRINT_EXPORT_KEY = os.environ.get("PRINT_EXPORT_KEY", "")
+
+# How long a label export stays retrievable when a job is never reconciled, and
+# how long it survives after it is. The SRS asks for deletion within 24 hours of
+# reconciliation; the longer ceiling stops an abandoned job keeping raw tokens
+# indefinitely.
+EXPORT_MAX_AGE_DAYS = int(env("EXPORT_MAX_AGE_DAYS", "30"))
+EXPORT_GRACE_HOURS_AFTER_RECONCILE = int(
+    env("EXPORT_GRACE_HOURS_AFTER_RECONCILE", "24")
+)
+
 # --- verification policy (docs/05 pilot starting values) -------------------
 # These are pilot settings to be tuned against real network measurements, not
 # properties of the cryptography.

@@ -163,8 +163,21 @@ export type ActivationJob = {
   failures: { unit_id: string; reason: string }[];
 };
 
+export type PrintJob = {
+  id: string;
+  batch: string;
+  planned_count: number;
+  issued_count: number;
+  status: string;
+  reconciled_at: string | null;
+  export_available: boolean;
+  export_expires_at: string | null;
+  export_deleted_at: string | null;
+  created_at: string;
+};
+
 export type LabelExport = {
-  print_job: { id: string; batch: string; issued_count: number; status: string };
+  print_job: PrintJob;
   label_export: { external_reference: string; qr_url: string }[];
   export_notice: string;
 };

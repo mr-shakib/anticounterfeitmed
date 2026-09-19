@@ -70,6 +70,21 @@ manufacturer_patterns = [
     ),
     path("v1/staff/print-jobs", serialization_api.print_jobs, name="staff-print-jobs"),
     path(
+        "v1/staff/batches/<uuid:batch_id>/print-jobs",
+        serialization_api.batch_print_jobs,
+        name="staff-batch-print-jobs",
+    ),
+    path(
+        "v1/staff/print-jobs/<uuid:job_id>/export",
+        serialization_api.print_job_export,
+        name="staff-print-job-export",
+    ),
+    path(
+        "v1/staff/print-jobs/<uuid:job_id>/reconcile",
+        serialization_api.reconcile_job,
+        name="staff-print-job-reconcile",
+    ),
+    path(
         "v1/staff/manufacturing-confirmations",
         qc_api.manufacturing_confirmations,
         name="staff-manufacturing-confirmations",

@@ -9,6 +9,7 @@ recover one.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -16,6 +17,7 @@ from django.utils import timezone
 from apps.audit.models import AuditAction, AuditEvent
 from apps.catalog.models import Batch
 from apps.organizations.models import Organization
+from apps.serialization.export_store import encrypt_export
 from apps.serialization.models import PackageUnit, PrintJob, PrintJobStatus, UnitLifecycle
 from medcrypto import generate_token, hash_token
 
@@ -104,8 +106,25 @@ def create_print_job(
 
     PackageUnit.objects.bulk_create(units)
 
+    # Retain the export, encrypted and on a clock, so the labels can be
+    # collected again before the job is reconciled. Without this a manufacturer
+    # who navigates away loses a run's worth of codes and has to void and
+    # reissue every unit.
+    from django.conf import settings
+
+    job.export_ciphertext = encrypt_export(
+        [
+            {"external_reference": u.external_reference, "token": u.token}
+            for u in issued
+        ]
+    )
+    job.export_expires_at = timezone.now() + timedelta(
+        days=settings.EXPORT_MAX_AGE_DAYS
+    )
     job.issued_count = count
-    job.save(update_fields=["issued_count"])
+    job.save(
+        update_fields=["issued_count", "export_ciphertext", "export_expires_at"]
+    )
 
     AuditEvent.objects.create(
         action=AuditAction.UNITS_GENERATED,
@@ -118,6 +137,73 @@ def create_print_job(
     )
 
     return PrintJobResult(print_job=job, units=issued)
+
+
+@transaction.atomic
+def reconcile_print_job(
+    *,
+    job: PrintJob,
+    printed: int,
+    rejected: int,
+    actor_description: str = "",
+) -> PrintJob:
+    """Record the counts that came back from printing.
+
+    Reconciliation starts the clock on the export: once quantities are agreed
+    there is no further reason to hold raw tokens, so it is deleted within the
+    grace period rather than at the longer ceiling.
+    """
+    from django.conf import settings
+
+    job.reconciled_printed = printed
+    job.reconciled_rejected = rejected
+    job.reconciled_at = timezone.now()
+    job.status = PrintJobStatus.RECONCILED
+    job.export_expires_at = timezone.now() + timedelta(
+        hours=settings.EXPORT_GRACE_HOURS_AFTER_RECONCILE
+    )
+    job.save(
+        update_fields=[
+            "reconciled_printed", "reconciled_rejected", "reconciled_at",
+            "status", "export_expires_at",
+        ]
+    )
+
+    AuditEvent.objects.create(
+        action=AuditAction.UNITS_GENERATED,
+        organization=job.manufacturer,
+        batch_id=job.batch_id,
+        actor_description=actor_description,
+        reason="print job reconciled",
+        detail={
+            "print_job_id": str(job.id),
+            "printed": printed,
+            "rejected": rejected,
+            "export_expires_at": job.export_expires_at.isoformat(),
+        },
+    )
+    return job
+
+
+def purge_expired_exports(now=None) -> int:
+    """Delete label exports that have passed their expiry.
+
+    Run on a schedule. Deletion is recorded on the job so the disposal of an
+    artifact containing raw tokens is visible rather than silent.
+    """
+    now = now or timezone.now()
+    expired = PrintJob.objects.filter(
+        export_ciphertext__isnull=False,
+        export_expires_at__lt=now,
+        export_deleted_at__isnull=True,
+    )
+    count = 0
+    for job in expired:
+        job.export_ciphertext = None
+        job.export_deleted_at = now
+        job.save(update_fields=["export_ciphertext", "export_deleted_at"])
+        count += 1
+    return count
 
 
 @transaction.atomic
