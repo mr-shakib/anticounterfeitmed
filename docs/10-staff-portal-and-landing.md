@@ -39,7 +39,8 @@ compulsory, removal is an administrator action instead.
 | Product catalog | Brand, generic, strength, dosage form, unit/pack description, manufacturer, reference packaging image, registration reference if available |
 | Batch setup | Product, manufacturer batch number, manufacturing date, **explicit expiry date**, planned unit count |
 | Serialization | Create unique unit IDs/tokens, controlled label export for off-system printing, count issued units |
-| Manufacturing readiness | Record printed / QC-passed / rejected / coated / voided unit lists; show activation-ready quantities |
+| Print-line scan | Read each printed code back, by handheld scanner or camera. Records `PRINTED` as **observed evidence**, not an assertion, and shows a running scanned-of-total count |
+| Manufacturing readiness | Record printed / QC-passed / rejected / coated / voided for a batch or unit list; show per-step counts and the activation-ready quantity **before** activation is attempted |
 | Activation | Release manager approves **only** QC-passed, covered, unexpired units; signed credential created **before** each unit becomes active |
 | Recall / block | Recall a batch or block units, with reason, effective timestamp, contact instructions |
 | Results and reports | Own verification totals, repeat events, investigation cases. **No access to other manufacturers.** |

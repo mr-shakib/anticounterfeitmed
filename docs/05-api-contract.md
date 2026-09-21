@@ -20,7 +20,8 @@ Source: SRS §5.3, §4.3. All paths are proposed contracts; organization- and ob
 | `POST /v1/products` | Manufacturer | Create product |
 | `POST /v1/batches` | Manufacturer | Create batch |
 | `POST /v1/print-jobs` | Manufacturer | Generate serials/tokens + controlled label export |
-| `POST /v1/manufacturing-confirmations` | Authorized mfr. staff | Record printed/QC/coated for exact unit lists, with completion time + source reference |
+| `POST /v1/print-scans` | Authorized mfr. staff | Read one printed code back on the line. Takes a **raw token**, stores only its digest, and records `PRINTED` as scan evidence. Refused once a unit is past `CREATED`. |
+| `POST /v1/manufacturing-confirmations` | Authorized mfr. staff | Record printed/QC/coated for a whole batch or an exact unit list, with completion time + source reference |
 | `POST /v1/activation-jobs` | Mfr. release manager | Approve / sign / activate eligible units |
 | `GET /v1/activation-jobs/{id}` | Authorized mfr. | Per-unit results and failure counts |
 | `POST /v1/consumer/verifications/prepare` | Attested session | Fetch signed info/status; issue challenge. **Does not redeem.** |

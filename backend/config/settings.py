@@ -135,6 +135,9 @@ REST_FRAMEWORK = {
         # Pilot starting values (docs/05). Tune against real networks.
         "consumer_prepare": env("RATE_LIMIT_PREPARE", "30/min"),
         "consumer_confirm": env("RATE_LIMIT_CONFIRM", "10/min"),
+        # A print line reading labels in sequence, and nothing like fast
+        # enough to search the token space.
+        "staff_print_scan": env("RATE_LIMIT_PRINT_SCAN", "600/min"),
     },
 }
 

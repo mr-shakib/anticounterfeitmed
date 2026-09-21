@@ -18,6 +18,7 @@ from rest_framework.response import Response
 
 from apps.catalog.models import Batch
 from apps.organizations.permissions import STAFF_AUTH, IsManufacturerStaff, owns
+from apps.qc.services import batch_manufacturing_progress
 from apps.serialization.models import PackageUnit, PrintJob
 from apps.serialization.export_store import ExportUnavailable, decrypt_export
 from apps.serialization.services import (
@@ -141,6 +142,9 @@ def batch_units(request, batch_id):
     return Response(
         {
             "counts_by_lifecycle": counts,
+            # Manufacturer-asserted records, not captured scan evidence. The
+            # portal labels them as such.
+            **batch_manufacturing_progress(batch.id),
             "units": UnitSerializer(queryset[:500], many=True).data,
         }
     )

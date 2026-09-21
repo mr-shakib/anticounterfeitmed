@@ -840,3 +840,139 @@ def test_self_removal_is_audited(make_manufacturer, settings):
     event = AuditEvent.objects.filter(action=AuditAction.STAFF_MFA_RESET).first()
     assert event is not None
     assert "removed their own" in event.reason
+
+
+# --- batch-wide recording and the readiness counts --------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_recording_a_step_against_a_batch_covers_every_unit(make_manufacturer):
+    """One record call, the whole run.
+
+    The portal's unit table is capped, so recording against the units it holds
+    would leave a larger batch part recorded and part not -- and the shortfall
+    would only surface later, as activation failures.
+    """
+    actor = make_manufacturer("Alpha")
+    create_print_job(batch=actor["batch"], count=7)
+
+    client = APIClient()
+    sign_in(client, actor)
+    response = client.post(
+        reverse("staff-manufacturing-confirmations"),
+        {
+            "batch": str(actor["batch"].id),
+            "step": ManufacturingStep.PRINTED,
+            "completed_at": timezone.now().isoformat(),
+            "source_reference": "production log",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 200, response.data
+    assert response.data["recorded"] == 7
+    assert (
+        PackageUnit.objects.filter(
+            batch=actor["batch"], lifecycle=UnitLifecycle.PRINTED
+        ).count()
+        == 7
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_batch_cannot_be_recorded_against_by_another_manufacturer(make_manufacturer):
+    alpha = make_manufacturer("Alpha")
+    beta = make_manufacturer("Beta")
+    create_print_job(batch=beta["batch"], count=2)
+
+    client = APIClient()
+    sign_in(client, alpha)
+    response = client.post(
+        reverse("staff-manufacturing-confirmations"),
+        {
+            "batch": str(beta["batch"].id),
+            "step": ManufacturingStep.PRINTED,
+            "completed_at": timezone.now().isoformat(),
+            "source_reference": "forged-log",
+        },
+        format="json",
+    )
+
+    assert response.status_code == 404
+    assert not PackageUnit.objects.filter(
+        batch=beta["batch"], lifecycle=UnitLifecycle.PRINTED
+    ).exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_batch_units_reports_readiness_before_activation(make_manufacturer):
+    """The release manager can see what one click would activate, beforehand."""
+    actor = make_manufacturer("Alpha")
+    result = create_print_job(batch=actor["batch"], count=3)
+    units = [PackageUnit.objects.get(pk=u.unit_id) for u in result.units]
+
+    # Two units all the way through; the third only printed.
+    for unit in units[:2]:
+        for step in (
+            ManufacturingStep.PRINTED,
+            ManufacturingStep.QC_PASSED,
+            ManufacturingStep.COATED,
+        ):
+            record_completion(
+                unit=unit,
+                step=step,
+                completed_at=timezone.now(),
+                recorded_by=actor["user"],
+                source_reference="log",
+            )
+    record_completion(
+        unit=units[2],
+        step=ManufacturingStep.PRINTED,
+        completed_at=timezone.now(),
+        recorded_by=actor["user"],
+        source_reference="log",
+    )
+
+    client = APIClient()
+    sign_in(client, actor)
+    response = client.get(
+        reverse("staff-batch-units", args=[str(actor["batch"].id)])
+    )
+
+    assert response.status_code == 200, response.data
+    assert response.data["counts_by_step"][ManufacturingStep.PRINTED] == 3
+    assert response.data["counts_by_step"][ManufacturingStep.QC_PASSED] == 2
+    assert response.data["counts_by_step"][ManufacturingStep.COATED] == 2
+    assert response.data["counts_by_step"][ManufacturingStep.QC_REJECTED] == 0
+    assert response.data["units_ready"] == 2
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_blocked_unit_is_not_counted_as_ready(make_manufacturer):
+    actor = make_manufacturer("Alpha")
+    result = create_print_job(batch=actor["batch"], count=2)
+    units = [PackageUnit.objects.get(pk=u.unit_id) for u in result.units]
+    for unit in units:
+        for step in (
+            ManufacturingStep.PRINTED,
+            ManufacturingStep.QC_PASSED,
+            ManufacturingStep.COATED,
+        ):
+            record_completion(
+                unit=unit,
+                step=step,
+                completed_at=timezone.now(),
+                recorded_by=actor["user"],
+                source_reference="log",
+            )
+
+    client = APIClient()
+    sign_in(client, actor)
+    client.post(
+        reverse("staff-unit-block", args=[str(units[0].id)]),
+        {"reason": "damaged in handling"},
+        format="json",
+    )
+    response = client.get(reverse("staff-batch-units", args=[str(actor["batch"].id)]))
+
+    assert response.data["units_ready"] == 1

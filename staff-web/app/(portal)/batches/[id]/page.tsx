@@ -2,8 +2,9 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import {
-  ActivationJob, ApiError, Batch, LabelExport, PrintJob, Unit, api,
+  ActivationJob, ApiError, Batch, BatchUnits, LabelExport, PrintJob, Unit, api,
 } from "@/lib/api";
+import { PrintScanner } from "@/components/PrintScanner";
 import { LabelSheet, LABEL_SIZES_MM } from "@/components/LabelSheet";
 import { useSession } from "@/components/Session";
 
@@ -32,6 +33,9 @@ export default function BatchDetailPage({
 
   const [batch, setBatch] = useState<Batch | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [stepCounts, setStepCounts] = useState<Record<string, number>>({});
+  const [unitsReady, setUnitsReady] = useState(0);
+  const [unitsScanned, setUnitsScanned] = useState(0);
   const [units, setUnits] = useState<Unit[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -49,16 +53,19 @@ export default function BatchDetailPage({
   const [recallNotice, setRecallNotice] = useState("");
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
 
+  const totalUnits = Object.values(counts).reduce((a, b) => a + b, 0);
+
   const load = useCallback(async () => {
     try {
       const [b, u] = await Promise.all([
         api.get<Batch>(`/v1/staff/batches/${id}`),
-        api.get<{ counts_by_lifecycle: Record<string, number>; units: Unit[] }>(
-          `/v1/staff/batches/${id}/units`,
-        ),
+        api.get<BatchUnits>(`/v1/staff/batches/${id}/units`),
       ]);
       setBatch(b);
       setCounts(u.counts_by_lifecycle);
+      setStepCounts(u.counts_by_step);
+      setUnitsReady(u.units_ready);
+      setUnitsScanned(u.units_scan_verified);
       setUnits(u.units);
       setPrintJobs(await api.get<PrintJob[]>(`/v1/staff/batches/${id}/print-jobs`));
     } catch (e) {
@@ -122,14 +129,16 @@ export default function BatchDetailPage({
 
   const recordStep = () =>
     run(async () => {
-      const ids = units
-        .filter((u) => !u.is_blocked)
-        .map((u) => u.id);
-      if (ids.length === 0) throw new ApiError(400, "NO_UNITS", "No units to record against.");
+      // Against the batch rather than the units on screen: the table holds at
+      // most 500, and recording only those would leave a larger run silently
+      // half done.
+      if (totalUnits === 0) {
+        throw new ApiError(400, "NO_UNITS", "No units to record against.");
+      }
       const result = await api.post<{ recorded: number; rejected: unknown[] }>(
         "/v1/staff/manufacturing-confirmations",
         {
-          unit_ids: ids,
+          batch: id,
           step,
           completed_at: new Date(completedAt).toISOString(),
           source_reference: sourceReference,
@@ -353,13 +362,46 @@ export default function BatchDetailPage({
         )}
       </div>
 
-      <h2>2 · Record manufacturing</h2>
+      <h2>2 · Scan the printed codes</h2>
+      <PrintScanner
+        batchId={id}
+        scanned={unitsScanned}
+        total={totalUnits}
+        onProgress={(p) => {
+          setUnitsScanned(p.units_scan_verified);
+          setUnitsReady(p.units_ready);
+        }}
+      />
+
+      <h2>3 · Record QC and coating</h2>
       <div className="card">
         <div className="alert info" style={{ marginTop: 0 }}>
           These are operational records entered by your staff, not scan evidence
-          captured by this system. Both the completion time you enter and the
-          time it was entered are stored.
+          captured by this system — only the print scan above is that. Both the
+          completion time you enter and the time it was entered are stored.
         </div>
+        {totalUnits > 0 && (
+          <div className="grid" style={{ marginBottom: "1rem" }}>
+            {STEPS.map((s) => (
+              <div className="stat" key={s.value}>
+                <div className="value">
+                  {stepCounts[s.value] ?? 0}
+                  <span className="muted" style={{ fontSize: "0.95rem" }}>
+                    {" "}/ {totalUnits}
+                  </span>
+                </div>
+                <div className="label">
+                  {s.label} recorded
+                  {s.value === "PRINTED" && unitsScanned > 0 && (
+                    <>
+                      {" "}— {unitsScanned} from a scan, the rest asserted
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="row">
           <label>
             <span>Step</span>
@@ -388,7 +430,7 @@ export default function BatchDetailPage({
           <div className="shrink">
             <button
               onClick={recordStep}
-              disabled={busy || !completedAt || !sourceReference || units.length === 0}
+              disabled={busy || !completedAt || !sourceReference || totalUnits === 0}
             >
               Record
             </button>
@@ -396,7 +438,7 @@ export default function BatchDetailPage({
         </div>
       </div>
 
-      <h2>3 · Activate</h2>
+      <h2>4 · Activate</h2>
       <div className="card">
         {!canRelease ? (
           <p className="muted" style={{ margin: 0 }}>
@@ -408,8 +450,19 @@ export default function BatchDetailPage({
               Signs a credential for every unit that has printing, QC and coating
               recorded. Units missing a record stay inactive and are listed below.
             </p>
-            <button onClick={activate} disabled={busy || batch.is_recalled}>
-              Activate eligible units
+            <p style={{ margin: "0 0 0.75rem" }}>
+              <strong>{unitsReady}</strong> of {totalUnits} unit(s) ready to activate.
+              {unitsReady === 0 && totalUnits > 0 && (
+                <span className="muted">
+                  {" "}Record printing, QC and coating first.
+                </span>
+              )}
+            </p>
+            <button
+              onClick={activate}
+              disabled={busy || batch.is_recalled || unitsReady === 0}
+            >
+              Activate {unitsReady} unit(s)
             </button>
 
             {job && (

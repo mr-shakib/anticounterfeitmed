@@ -152,6 +152,19 @@ export type Unit = {
   redeemed_at: string | null;
 };
 
+/// Progress through the manufacturing records a batch needs before activation.
+///
+/// Counts are of units, not events, and every one is a manufacturer assertion
+/// rather than scan evidence captured by this system.
+export type BatchUnits = {
+  counts_by_lifecycle: Record<string, number>;
+  counts_by_step: Record<string, number>;
+  units_ready: number;
+  /** The subset of PRINTED records this system observed, rather than was told. */
+  units_scan_verified: number;
+  units: Unit[];
+};
+
 export type ActivationJob = {
   id: string;
   approval_id: string;

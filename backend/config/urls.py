@@ -84,6 +84,7 @@ manufacturer_patterns = [
         serialization_api.reconcile_job,
         name="staff-print-job-reconcile",
     ),
+    path("v1/staff/print-scans", qc_api.print_scans, name="staff-print-scans"),
     path(
         "v1/staff/manufacturing-confirmations",
         qc_api.manufacturing_confirmations,

@@ -19,6 +19,8 @@ Read [docs/00-index.md](docs/00-index.md) first. The authoritative requirements 
 
 **Do not build:** factory/printing/QC interfaces, pharmacy anything, sale events, offline redemption, AI models, iOS, or App Links/Universal Links. These are deferred by the SRS. If a task seems to require one, stop and ask — it usually means the requirement was misread.
 
+**One exception, by owner decision (2026-09-21): the print-line scan.** `POST /v1/staff/print-scans` reads a printed code back and records `PRINTED` as observed evidence. It is the only staff endpoint that accepts a raw token, and it stays narrow: own organization only, rate-limited, refused once a unit leaves `CREATED`, and it never touches redemption. The rest of the factory/QC end remains deferred.
+
 ## Conventions
 
 - Backend module boundaries in [docs/02](docs/02-architecture.md). Cross-app access goes through service functions, not another app's ORM models.
@@ -40,6 +42,6 @@ These affect what the project may claim in reports and to users:
 
 - The pilot produces **"PQC-signed verification records"** — not a "fully post-quantum secure system".
 - Platform-held manufacturer keys produce a **"platform-managed manufacturer-associated signature"** — not independent proof only the manufacturer could sign.
-- Manufacturing records are **manufacturer-asserted**, not captured factory scan evidence.
+- Manufacturing records are **manufacturer-asserted**, except the `PRINTED` step where a print-line scan recorded it — that one is observed evidence, and the two are distinguished by `is_manufacturer_asserted` and shown apart in the portal. **QC pass and coating are always assertions**: the coating is applied after scanning and covers the code, so no scan can evidence it.
 - **Copying a QR before first redemption remains unsolved.** Say so.
 - Repeat scans and rate-limit failures are **not** counterfeit labels.
