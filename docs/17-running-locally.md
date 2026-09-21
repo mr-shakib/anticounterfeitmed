@@ -224,19 +224,24 @@ machine's LAN address for a physical phone.
 
 ```bash
 cd consumer-app
-flutter run --release \
+flutter run --profile \
   --dart-define=ROOT_PUBLIC_KEY="$ROOT" \
   --dart-define=BACKEND_BASE_URL=http://10.0.2.2:8000
 ```
 
+Use `--profile`, not `--release`. A release build attests with Play Integrity
+and refuses to run without a Firebase project; debug and profile builds send
+the placeholder token that the development backend's `accept-any` mode takes.
+
 To build an installable APK instead:
 
 ```bash
-make apk         # writes dist/ and prints its sha256
+make apk-dev     # profile build, debug-signed, for sideloading onto a test phone
 ```
 
-Note the defaults: a `make apk` build has no root key or backend URL compiled
-in, so it is for checking the interface, not for talking to a server.
+`make apk` is the distributable build: it needs the upload keystore and the
+`FIREBASE_*` values, and it names anything missing. See
+[consumer-app/README.md](../consumer-app/README.md).
 
 ### Checking the crypto on a device
 

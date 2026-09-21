@@ -1,0 +1,12 @@
+# Copy to key.properties and fill in. key.properties is gitignored; keep it and
+# the keystore it points at outside any repository, and back the keystore up.
+#
+# Create the keystore with:
+#   keytool -genkey -v -keystore ~/keys/anticounterfeitmed-upload.jks \
+#     -keyalg RSA -keysize 4096 -validity 10000 -alias upload
+
+# Absolute path, or relative to consumer-app/android/app.
+storeFile=/home/you/keys/anticounterfeitmed-upload.jks
+storePassword=
+keyAlias=upload
+keyPassword=

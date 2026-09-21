@@ -7,7 +7,7 @@ COMPOSE := docker compose -f infra/docker-compose.dev.yml
         up down stop migrate \
         serve serve-nomfa seed staff staff-code operator \
         test vectors vectors-regen crosscheck leakcheck check \
-        apk labels brand landing-csp \
+        apk apk-dev labels brand landing-csp \
         backup restore-drill
 
 help:  ## List these targets
@@ -79,11 +79,42 @@ check: test vectors crosscheck leakcheck  ## Everything CI runs
 
 # --- build artefacts --------------------------------------------------------
 
-apk:  ## Build the Android consumer APK into dist/
-	cd consumer-app && flutter build apk --release --target-platform=android-arm64
+# A release APK is a distributable artefact: it is signed with the upload key,
+# points at a real API, and carries the Firebase project that App Check attests
+# against. None of that has a safe default, so each is required rather than
+# guessed. See consumer-app/README.md.
+APK_REQUIRED := BACKEND_BASE_URL ROOT_PUBLIC_KEY FIREBASE_PROJECT_ID FIREBASE_APP_ID FIREBASE_API_KEY FIREBASE_MESSAGING_SENDER_ID
+# All three ABIs by default: 32-bit phones are common in the pilot market and an
+# arm64-only APK will not install on them. Narrow it for a quicker local build.
+APK_PLATFORMS ?= android-arm64,android-arm,android-x64
+
+apk:  ## Build the signed release APK into dist/ (see consumer-app/README.md for the variables)
+	@missing=""; for v in $(APK_REQUIRED); do \
+	  eval "val=\$$$$v"; [ -n "$$val" ] || missing="$$missing $$v"; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	  echo "make apk needs:$$missing"; \
+	  echo "See consumer-app/README.md. For a development build, use: make apk-dev"; \
+	  exit 1; \
+	fi
+	cd consumer-app && flutter build apk --release --target-platform=$(APK_PLATFORMS) \
+	  --dart-define=BACKEND_BASE_URL="$(BACKEND_BASE_URL)" \
+	  --dart-define=ROOT_PUBLIC_KEY="$(ROOT_PUBLIC_KEY)" \
+	  --dart-define=FIREBASE_PROJECT_ID="$(FIREBASE_PROJECT_ID)" \
+	  --dart-define=FIREBASE_APP_ID="$(FIREBASE_APP_ID)" \
+	  --dart-define=FIREBASE_API_KEY="$(FIREBASE_API_KEY)" \
+	  --dart-define=FIREBASE_MESSAGING_SENDER_ID="$(FIREBASE_MESSAGING_SENDER_ID)"
 	@mkdir -p dist
 	cp consumer-app/build/app/outputs/flutter-apk/app-release.apk dist/anticounterfeitmed-consumer.apk
 	@sha256sum dist/anticounterfeitmed-consumer.apk
+
+apk-dev:  ## Build a profile APK for sideloaded development. Not distributable.
+	cd consumer-app && flutter build apk --profile --target-platform=$(APK_PLATFORMS) \
+	  --dart-define=BACKEND_BASE_URL="$(or $(BACKEND_BASE_URL),http://10.0.2.2:8000)" \
+	  --dart-define=ROOT_PUBLIC_KEY="$(ROOT_PUBLIC_KEY)"
+	@mkdir -p dist
+	cp consumer-app/build/app/outputs/flutter-apk/app-profile.apk dist/anticounterfeitmed-consumer-dev.apk
+	@echo "Development build: debug-signed, and it sends the placeholder attestation token."
 
 labels:  ## Generate the printable physical QR test sheet (80 labels)
 	$(PY) spikes/s1-qr/generate_test_labels.py
