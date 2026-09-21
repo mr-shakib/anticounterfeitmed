@@ -15,15 +15,22 @@ import 'package:http/http.dart' as http;
 
 import '../core/outcomes.dart';
 import '../crypto/verifier.dart';
+import 'attestation.dart';
 import 'session_store.dart';
 import 'trust_store.dart';
 
-/// Raised when attestation fails.
+/// Raised when attestation fails, on this device or at the server.
 ///
 /// Kept distinct because the SRS specifies a hard stop here: the user is told
 /// the device cannot verify. If decision D20 later chooses a degraded path
 /// instead, this is the single place that changes.
-class AttestationRejected implements Exception {}
+class AttestationRejected implements Exception {
+  /// Static text for the log. Never a token or anything derived from one.
+  final String reason;
+  AttestationRejected([this.reason = 'rejected by the server']);
+  @override
+  String toString() => 'AttestationRejected: $reason';
+}
 
 class ResponseUntrusted implements Exception {
   final String reason;
@@ -97,7 +104,7 @@ class ApiClient {
     Future<String> Function()? attestationProvider,
   })  : _store = sessionStore,
         _http = httpClient ?? http.Client(),
-        _attestation = attestationProvider ?? _defaultAttestation;
+        _attestation = attestationProvider ?? attestationToken;
 
   final String baseUrl;
   final Uint8List rootPublicKey;
@@ -113,11 +120,17 @@ class ApiClient {
   /// regardless.
   static const manifestMaxAge = Duration(hours: 24);
 
-  static Future<String> _defaultAttestation() async {
-    // Replaced by the Firebase App Check SDK once a project exists (D9).
-    // Until then the development backend accepts any non-empty token, and the
-    // production backend refuses this mode outright.
-    return 'dev-token';
+  /// An App Check token, or a hard stop.
+  ///
+  /// A device that cannot attest never reaches the network: there is no
+  /// request worth making without a token, and no fallback header that would
+  /// stand in for one.
+  Future<String> _attestationToken() async {
+    try {
+      return await _attestation();
+    } on AttestationUnavailable catch (error) {
+      throw AttestationRejected(error.reason);
+    }
   }
 
   final _random = Random.secure();
@@ -130,7 +143,7 @@ class ApiClient {
   Future<Map<String, String>> _headers({bool withSession = true}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'X-App-Check': await _attestation(),
+      'X-App-Check': await _attestationToken(),
     };
     if (withSession) {
       final credential = await _ensureSession();
@@ -147,7 +160,7 @@ class ApiClient {
       Uri.parse('$baseUrl/v1/consumer/sessions'),
       headers: {
         'Content-Type': 'application/json',
-        'X-App-Check': await _attestation(),
+        'X-App-Check': await _attestationToken(),
       },
       body: json.encode({}),
     );
