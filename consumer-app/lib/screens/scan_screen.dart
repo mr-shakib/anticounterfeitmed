@@ -38,7 +38,13 @@ class _ScanScreenState extends State<ScanScreen> {
     returnImage: true,
     // CameraX's default analysis frame is 640x480, where a 20 mm label can
     // fall to about 2 pixels per module; ZXing needs 2.5 or more.
-    cameraResolution: Size(1280, 720),
+    //
+    // Keep it 4:3. mobile_scanner sizes the preview widget from the analysis
+    // frame, while the preview itself stays at CameraX's default 4:3, so a
+    // 16:9 request (1280x720) stretches the picture on screen. The new
+    // selector reads this as a landscape sensor bound with a 4:3 aspect.
+    cameraResolution: Size(1280, 960),
+    useNewCameraSelector: true,
   );
   bool _handling = false;
   // A frame is being read by ZXing; later frames wait for it.
