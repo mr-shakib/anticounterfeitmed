@@ -8,7 +8,7 @@ COMPOSE := docker compose -f infra/docker-compose.dev.yml
         serve serve-nomfa seed staff staff-code operator \
         test vectors vectors-regen label-vectors crosscheck leakcheck \
         portal-test app-test check \
-        apk apk-dev labels brand landing-csp \
+        apk apk-dev app publish-app play-bundle labels brand landing-csp \
         backup restore-drill
 
 help:  ## List these targets
@@ -125,6 +125,15 @@ apk-dev:  ## Build a profile APK for sideloaded development. Not distributable.
 	@mkdir -p dist
 	cp consumer-app/build/app/outputs/flutter-apk/app-profile.apk dist/anticounterfeitmed-consumer-dev.apk
 	@echo "Development build: debug-signed, and it sends the placeholder attestation token."
+
+app:  ## Build the app per BUILD_KIND into dist/, reading infra/.env.deploy; publishes nothing
+	./scripts/publish_app.sh apk
+
+publish-app:  ## Build the app and publish it on the hub, in one step (reads infra/.env.deploy)
+	./scripts/publish_app.sh
+
+play-bundle:  ## Build the signed, attested release bundle for Google Play into dist/
+	./scripts/publish_app.sh bundle
 
 labels:  ## Generate the printable physical QR test sheet (80 labels)
 	$(PY) spikes/s1-qr/generate_test_labels.py
