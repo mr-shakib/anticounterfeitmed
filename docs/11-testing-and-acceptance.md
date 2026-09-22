@@ -53,7 +53,7 @@ Production prints **version 6 / Q** only; the M row exists for the comparison th
 
 **The tension that remains.** A scratched coating damages the symbol, which argues for Q. But at a fixed footprint Q still costs a version over M, and the 20 mm / Q cell is the most print-sensitive in the matrix. It is also the cell the scratch layer most needs. Test it first; if it fails, the realistic choice is a 25 mm footprint.
 
-**Two additions to the physical test for this format.** On each phone, scan a label with the default camera app and one third-party QR app and confirm they show **only** `https://anticounterfeitmed.com/`. Then scan the same labels with the consumer app and confirm it reads the token — this is the on-device check that ML Kit reports the full data codewords on that phone, which the format depends on.
+**Two additions to the physical test for this format.** On each phone, scan a label with the default camera app and one third-party QR app and confirm they show **only** `https://anticounterfeitmed.com/`. Then scan the same labels with the consumer app and confirm it reads the token — this is the on-device check that ZXing reads the label from that phone's camera frames, including after scratching. Record the time from framing to result: the ZXing pass adds a few hundred milliseconds on a mid-range phone.
 
 Generate the sheet with `make labels`.
 

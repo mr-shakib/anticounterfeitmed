@@ -5,10 +5,12 @@
 /// link and never sent anywhere.
 library;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../app_state.dart';
+import '../core/label_reader.dart';
 import '../core/outcomes.dart';
 import '../core/scanned_url.dart';
 import '../data/api_client.dart';
@@ -27,10 +29,20 @@ class ScanScreen extends StatefulWidget {
 
 class _ScanScreenState extends State<ScanScreen> {
   final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    // Every frame, not only new codes: ZXing does not always read a label from
+    // the first frame ML Kit saw it in, and a duplicate-suppressing scanner
+    // would never offer it another.
+    detectionSpeed: DetectionSpeed.normal,
     formats: const [BarcodeFormat.qrCode],
+    // The frame is handed to ZXing for the label's hidden record.
+    returnImage: true,
+    // CameraX's default analysis frame is 640x480, where a 20 mm label can
+    // fall to about 2 pixels per module; ZXing needs 2.5 or more.
+    cameraResolution: Size(1280, 720),
   );
   bool _handling = false;
+  // A frame is being read by ZXing; later frames wait for it.
+  bool _reading = false;
   String _hint = '';
 
   @override
@@ -40,20 +52,36 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
-    if (_handling) return;
+    if (_handling || _reading) return;
     final barcode = capture.barcodes.firstOrNull;
     if (barcode == null) return;
 
-    // The token is in the symbol's raw data codewords, not in its text. On
-    // Android, ML Kit reports every data codeword, padding included, and that
-    // is what this depends on: mobile_scanner 7 replaces rawBytes with
-    // rawDecodedBytes, so check the label vectors on a device before upgrading.
-    final scanned = parseScannedBarcode(
+    // The token is in the symbol's data codewords, after the text. ML Kit's
+    // rawBytes stops at the text, so a code that reads as our public URL goes
+    // to ZXing, which returns every codeword (lib/core/label_reader.dart).
+    var scanned = parseScannedBarcode(
       text: barcode.rawValue,
       rawBytes: barcode.rawBytes,
     );
+    final frame = capture.image;
+    if (scanned == null && barcode.rawValue == publicUrl && frame != null) {
+      _reading = true;
+      Uint8List? codewords;
+      try {
+        codewords = await compute(dataCodewordsFromImage, frame);
+      } finally {
+        _reading = false;
+      }
+      if (!mounted || _handling) return;
+      // ZXing could not read this frame. That is not a verdict on the code:
+      // wait for a better frame rather than calling it not ours.
+      if (codewords == null) return;
+      scanned = parseScannedBarcode(text: barcode.rawValue, rawBytes: codewords);
+    }
+
     if (scanned == null) {
-      setState(() => _hint = AppScope.of(context).strings.notOurCode);
+      final hint = AppScope.of(context).strings.notOurCode;
+      if (_hint != hint) setState(() => _hint = hint);
       return;
     }
 

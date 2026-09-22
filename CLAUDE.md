@@ -21,7 +21,7 @@ Read [docs/00-index.md](docs/00-index.md) first. The authoritative requirements 
 
 **One exception, by owner decision (2026-09-21): the print-line scan.** `POST /v1/staff/print-scans` reads a printed code back and records `PRINTED` as observed evidence. It is the only staff endpoint that accepts a raw token, and it stays narrow: own organization only, rate-limited, refused once a unit leaves `CREATED`, and it never touches redemption. The rest of the factory/QC end remains deferred.
 
-**Owner decision (2026-09-22, D21): an ordinary scanner sees only the public URL.** This overrides SRS §2.1. The label symbol carries `https://anticounterfeitmed.com/` as its only text, and the token after the terminator, where only raw-codeword readers (the app via ML Kit, the portal camera via ZXing) find it. The layout lives in `libs/medcrypto/medcrypto/labels.py`, and the Python, Dart and TypeScript parsers must all agree on `crypto-vectors/label/`. Do not put the token back in the URL.
+**Owner decision (2026-09-22, D21): an ordinary scanner sees only the public URL.** This overrides SRS §2.1. The label symbol carries `https://anticounterfeitmed.com/` as its only text, and the token after the terminator, where only raw-codeword readers (ZXing in both the app and the portal camera; ML Kit's `rawBytes` stops at the text, measured 2026-09-22) find it. The layout lives in `libs/medcrypto/medcrypto/labels.py`, and the Python, Dart and TypeScript parsers must all agree on `crypto-vectors/label/`. Do not put the token back in the URL.
 
 ## Conventions
 

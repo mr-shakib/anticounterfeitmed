@@ -33,10 +33,14 @@ dependencies:
   pqcrypto: ^0.4.1
   crypto: ^3.0.0
   http: ^1.2.0
-  # The label token is read from Barcode.rawBytes, which on Android is ML Kit's
-  # full data-codeword stream. Version 7 deprecates it for rawDecodedBytes; do
-  # not cross that line without re-checking crypto-vectors/label/ on a device.
+  # ML Kit finds the code; it does not expose the label's hidden record (its
+  # rawBytes is the decoded text). returnImage hands the frame to ZXing, which
+  # does. See lib/core/label_reader.dart.
   mobile_scanner: ^6.0.0
+  # Reads every data codeword of a label from a camera frame. Pure Dart.
+  zxing2: ^0.2.4
+  # Decodes the JPEG frame mobile_scanner returns, for ZXing.
+  image: ^4.3.0
   flutter_secure_storage: ^9.2.0
   shared_preferences: ^2.3.0
   intl: ^0.19.0

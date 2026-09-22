@@ -26,10 +26,10 @@ What the printed symbol holds, and who sees what:
 | Reader | Sees |
 | --- | --- |
 | Phone camera, generic QR app, handheld scanner | `https://anticounterfeitmed.com/` — nothing else |
-| This app (ML Kit raw codewords) | The public URL **and** the token |
+| This app (ML Kit finds the code, ZXing reads its codewords) | The public URL **and** the token |
 | The portal's print-line camera (ZXing raw codewords) | The public URL **and** the token |
 
-The layout is defined once, in `libs/medcrypto/medcrypto/labels.py`: a byte-mode segment holding exactly the public URL, the terminator, then the record `"MV"`, version `0x02` and the 32 raw token bytes, then standard padding. Version 6, error correction Q, always. The app reads `Barcode.rawBytes`, which on Android is ML Kit's full data-codeword stream, padding included.
+The layout is defined once, in `libs/medcrypto/medcrypto/labels.py`: a byte-mode segment holding exactly the public URL, the terminator, then the record `"MV"`, version `0x02` and the 32 raw token bytes, then standard padding. Version 6, error correction Q, always. The app finds codes with ML Kit, but ML Kit cannot recover the token: its `rawBytes` is the decoded text and stops at the terminator (measured 2026-09-22 on the bundled ML Kit 17.3.0: 31 bytes, the URL alone). So when ML Kit reads our public URL, the app hands that camera frame (`returnImage`, 1280×720) to ZXing (`zxing2`, pure Dart, in a background isolate), which returns every data codeword. A frame ZXing cannot read is retried on the next one, not called "not ours". Code: `lib/core/label_reader.dart`; tested on the shared label images, including a rotated JPEG-quality-50 frame.
 
 Before any network call, the app parses the codewords locally and accepts **only**:
 
@@ -44,7 +44,7 @@ Before any network call, the app parses the codewords locally and accepts **only
 
 **Original-format labels** (`https://anticounterfeitmed.com/#v=1&t=<token>`) are refused by default. A build with `--dart-define=ACCEPT_URL_LABELS=true` accepts them, for a pilot that already printed some; that build also accepts any hand-made URL QR carrying a valid token, which is exactly what the change was meant to stop.
 
-**Do not upgrade `mobile_scanner` to 7.x** without re-running the label vectors on a device: 7.x deprecates `rawBytes`.
+**Do not change `returnImage`, `cameraResolution` or `DetectionSpeed.normal` on the scanner** without re-testing on a device: ZXing needs the frame, needs about 2.5 pixels per module, and needs later frames when the first one fails.
 
 ## Verification sequence
 
@@ -97,7 +97,7 @@ If the backend commits but signing or delivery fails, the app shows a **pending*
 
 | Concern | Approach |
 | --- | --- |
-| QR decoding | `mobile_scanner` (camera + torch) |
+| QR decoding | `mobile_scanner` (camera + torch, ML Kit detection) and `zxing2` (the label's hidden record) |
 | Secure storage | `flutter_secure_storage` |
 | Attestation | Firebase App Check — Play Integrity (Android), App Attest (iOS) |
 | **ML-DSA verification** | **Unresolved — spike S2, doc 13.** Dart FFI to bundled `libcrypto`, or a vetted pure-Dart verifier. Must pass `crypto-vectors/`. |
