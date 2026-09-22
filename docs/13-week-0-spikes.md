@@ -15,7 +15,7 @@ Spike code lives in `spikes/` and is **throwaway** — except `crypto-vectors/`,
 **Do:**
 
 1. Stand up a placeholder page at the real domain (or a stand-in host) serving `/` directly.
-2. Generate QR codes for `https://<host>/#v=1&t=<43-char-token>`.
+2. Generate label symbols in the production format (`make labels`; doc 09, D21). An ordinary scanner must read only `https://<host>/`.
 3. Scan with **at least 3 representative Android phones** (the models the pilot will actually use), default camera apps **and** a common third-party QR app.
 4. Confirm the fragment survives to the page, and that `history.replaceState` strips it.
 5. Confirm **no** request carries the fragment to the server (check access logs — the fragment must never appear).

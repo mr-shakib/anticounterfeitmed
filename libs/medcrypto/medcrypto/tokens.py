@@ -40,8 +40,9 @@ def is_well_formed_token(token: str) -> bool:
 def hash_token(token: str) -> bytes:
     """Return ``SHA-256(raw_token)``, the only form that may be stored.
 
-    The digest is taken over the token's ASCII text, which is exactly what the
-    QR carries and what the activation credential commits to.
+    The digest is taken over the token's ASCII text, which is what the
+    activation credential commits to. The printed label carries the same 32
+    bytes raw (see ``medcrypto.labels``); readers re-encode them to this text.
     """
     if not is_well_formed_token(token):
         raise ValueError("malformed token")

@@ -191,7 +191,11 @@ export type PrintJob = {
 
 export type LabelExport = {
   print_job: PrintJob;
-  label_export: { external_reference: string; qr_url: string }[];
+  label_export: {
+    external_reference: string;
+    /** The symbol to print. Drawn by lib/labelSymbol.ts; never a URL. */
+    qr: { version: number; error_correction: string; data_codewords: string };
+  }[];
   export_notice: string;
 };
 

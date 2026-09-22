@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from medcrypto import labels
 from medcrypto.canonical import CanonicalisationError, parse_strict
 from medcrypto.contexts import Context
 from medcrypto.records import BindingError, check_activation_binding
@@ -46,6 +47,13 @@ def test_vector(path: Path):
             assert not expected_valid
         else:
             assert expected_valid
+        return
+
+    if check == "label":
+        token = labels.token_from_data_codewords(
+            bytes.fromhex(vector["data_codewords"]), text=vector["text"]
+        )
+        assert token == (vector["token"] if expected_valid else None)
         return
 
     signature_ok = verify_ok(

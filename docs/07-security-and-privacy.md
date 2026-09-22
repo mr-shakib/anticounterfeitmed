@@ -4,7 +4,7 @@ Source: SRS §2.2, §2.3, §5.2, §7.
 
 ## The actual security boundary — read this first
 
-The QR token is **readable by anyone who can see the uncovered QR**. App restriction is enforced by the API. It **cannot** make a copied QR undecodable, and it **cannot** stop someone using the genuine app with a copied token.
+The QR token is **readable by anyone who can see the uncovered QR and has a decoder that exposes raw codewords**. An ordinary scanner shows only the public URL (doc 09, D21); that stops casual reading and re-encoding of the text, not a determined reader, and not a photocopy of the printed symbol. App restriction is enforced by the API. It **cannot** make a copied QR undecodable, and it **cannot** stop someone using the genuine app with a copied token.
 
 **The unresolved attack is copying before first redemption.** Someone who reads the QR at the factory, or after scratching, can put a copy on another package and redeem first. The first response alone cannot tell which physical package is genuine.
 
@@ -28,7 +28,7 @@ What actually addresses it: physical controls, label reconciliation, scratch int
 
 ## Public landing page (SRS §2.2)
 
-The token sits in the URL fragment. The fragment keeps it out of ordinary HTTP request paths, but **browser scripts and the scanner can still read it**. Treat it as sensitive.
+Current labels open the landing page with no token at all: the URL an ordinary scanner reads is just `https://anticounterfeitmed.com/`. Labels printed in the original format put the token in the URL fragment, which keeps it out of HTTP request paths but lets **browser scripts and the scanner** read it — so the rules below still stand for as long as any such label exists.
 
 - Serve the landing page **directly at `/`**. Do not rely on a redirect to strip a token.
 - At page startup, remove the fragment with `history.replaceState` **without sending it anywhere**.

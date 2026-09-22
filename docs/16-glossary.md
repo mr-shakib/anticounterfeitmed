@@ -3,7 +3,7 @@
 | Term | Meaning in this project |
 | --- | --- |
 | **Unit** | One intact strip or package sold as a whole, identified by one hidden code. Not one tablet. |
-| **Token** | 32 random bytes, Base64url (43 chars), printed in the QR fragment. A possession credential. |
+| **Token** | 32 random bytes, Base64url (43 chars). Printed as raw bytes inside the label symbol, after the public URL, where ordinary scanners do not look (D21). A possession credential. |
 | **Token hash** | `SHA-256(raw_token)` — the only form stored in the database. |
 | **ACTIVE** | The manufacturer approved and signed the unit; it can be verified. |
 | **REDEEMED** | A **first consumer verification was committed**. Permanent. **Not** a sale, delivery, or consumption. |

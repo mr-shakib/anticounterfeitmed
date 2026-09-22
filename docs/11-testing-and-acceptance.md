@@ -38,20 +38,22 @@ Design:
 
 Record for each trial: success/failure, time to decode, phone, material, size, error correction, lighting.
 
-### Measured module sizes for the real URL (2026-09-17)
+### Measured module sizes for the label symbol (2026-09-22)
 
-The printed URL is 81 characters (`https://anticounterfeitmed.com/#v=1&t=` plus a 43-character token). That length fixes the symbol version, and therefore the module size at a given footprint:
+Since D21 the symbol carries the public URL (31 characters) plus a hidden record holding the token as 32 raw bytes — 68 data codewords in all (doc 09). That fixes the symbol version, and therefore the module size at a given footprint:
 
-| Footprint | EC | Modules incl. quiet zone | **Module size** |
-| --- | --- | --- | --- |
-| 20 mm | M | 45 | 0.444 mm |
-| 20 mm | Q | 53 | **0.377 mm** |
-| 25 mm | M | 45 | 0.556 mm |
-| 25 mm | Q | 53 | 0.472 mm |
+| Footprint | EC | Version | Modules incl. quiet zone | **Module size** |
+| --- | --- | --- | --- | --- |
+| 20 mm | M | 5 | 45 | 0.444 mm |
+| 20 mm | Q | 6 | 49 | **0.408 mm** |
+| 25 mm | M | 5 | 45 | 0.556 mm |
+| 25 mm | Q | 6 | 49 | 0.510 mm |
 
-**The tension this exposes.** A scratched coating damages the symbol, which argues for the higher error correction level Q. But at a fixed footprint, Q costs two symbol versions and shrinks each module to 0.377 mm at 20 mm — the smallest and most print-sensitive combination in the matrix. The 20 mm / Q cell is therefore the one most likely to fail the 95% gate, and it is also the cell the scratch layer most needs. Test it first; if it fails, the realistic choices are a 25 mm footprint or a shorter URL.
+Production prints **version 6 / Q** only; the M row exists for the comparison the SRS asks for. The previous URL format needed version 7 at Q (53 modules, 0.377 mm at 20 mm), so the hidden-record format is also the larger module.
 
-**Shortening the URL does not help within this domain.** Dropping `v=1&`, or even the whole `t=` prefix, leaves the symbol at version 7 under EC Q: the version-6 boundary falls at 73 characters and `https://anticounterfeitmed.com/#` plus a 43-character token is 75. The token's 43 characters are fixed by its 32 bytes of entropy and cannot shrink. Only a shorter host would cross the boundary — a 10-character domain would reach version 6 (0.408 mm at 20 mm). See decision D18.
+**The tension that remains.** A scratched coating damages the symbol, which argues for Q. But at a fixed footprint Q still costs a version over M, and the 20 mm / Q cell is the most print-sensitive in the matrix. It is also the cell the scratch layer most needs. Test it first; if it fails, the realistic choice is a 25 mm footprint.
+
+**Two additions to the physical test for this format.** On each phone, scan a label with the default camera app and one third-party QR app and confirm they show **only** `https://anticounterfeitmed.com/`. Then scan the same labels with the consumer app and confirm it reads the token — this is the on-device check that ML Kit reports the full data codewords on that phone, which the format depends on.
 
 Generate the sheet with `make labels`.
 

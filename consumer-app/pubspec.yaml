@@ -33,6 +33,9 @@ dependencies:
   pqcrypto: ^0.4.1
   crypto: ^3.0.0
   http: ^1.2.0
+  # The label token is read from Barcode.rawBytes, which on Android is ML Kit's
+  # full data-codeword stream. Version 7 deprecates it for rawDecodedBytes; do
+  # not cross that line without re-checking crypto-vectors/label/ on a device.
   mobile_scanner: ^6.0.0
   flutter_secure_storage: ^9.2.0
   shared_preferences: ^2.3.0

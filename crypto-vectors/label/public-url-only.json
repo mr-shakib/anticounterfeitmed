@@ -1,0 +1,8 @@
+{
+  "name": "public-url-only",
+  "description": "A code re-made from what an ordinary scanner shows: the public URL, padding, no record.",
+  "check": "label",
+  "data_codewords": "41f68747470733a2f2f616e7469636f756e746572666569746d65642e636f6d2f0ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec11ec",
+  "text": "https://anticounterfeitmed.com/",
+  "expected": "INVALID"
+}

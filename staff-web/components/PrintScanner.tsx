@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "@/lib/api";
-import { tokenFromScan } from "@/lib/scanned";
+import { readScan, type Scan } from "@/lib/scanned.ts";
 
 /**
  * Reading printed codes back on the print line.
  *
- * Two ways in, because print floors differ: a handheld scanner that types what
- * it reads into the focused field, or the device's own camera. Either way the
+ * Current labels carry the token where only a reader that exposes the symbol's
+ * raw codewords can see it, so they are scanned with the device's camera. A
+ * handheld scanner types text, which for these labels is the public URL alone;
+ * it still works for labels printed in the original URL format. Either way the
  * scanned value is turned into a token, posted, and dropped. It is never put
  * into state, into a URL, or onto the screen.
  *
@@ -82,21 +84,23 @@ export function PrintScanner({
   useEffect(() => setCount(scanned), [scanned]);
 
   const submit = useCallback(
-    async (raw: string) => {
-      const token = tokenFromScan(raw);
-      if (!token) {
-        setLog((entries) =>
-          [
-            {
-              key: nextKey.current++,
-              outcome: "NOT_MATCHED" as const,
-              text: "Not one of our codes",
-            },
-            ...entries,
-          ].slice(0, LOG_LIMIT),
-        );
+    async (scan: Scan) => {
+      const reading = readScan(scan);
+      if (reading.kind !== "token") {
+        const entry: Entry =
+          reading.kind === "public-only"
+            ? {
+                key: nextKey.current++,
+                outcome: "NOT_APPLICABLE",
+                text:
+                  "This reader sees only the public link on the label. " +
+                  "Scan current labels with the camera.",
+              }
+            : { key: nextKey.current++, outcome: "NOT_MATCHED", text: "Not one of our codes" };
+        setLog((entries) => [entry, ...entries].slice(0, LOG_LIMIT));
         return;
       }
+      const { token } = reading;
 
       setBusy(true);
       setError("");
@@ -129,29 +133,12 @@ export function PrintScanner({
   useEffect(() => {
     if (!camera) return;
 
-    // The browser's own decoder, where it exists. A scanner in the hand is the
-    // better tool on a real line; this is for a phone or tablet without one.
-    const Detector = (
-      window as unknown as {
-        BarcodeDetector?: new (o: { formats: string[] }) => {
-          detect: (s: CanvasImageSource) => Promise<{ rawValue: string }[]>;
-        };
-      }
-    ).BarcodeDetector;
-
-    if (!Detector) {
-      setCameraError(
-        "This browser cannot decode from the camera. Use a handheld scanner, " +
-          "or open the portal in Chrome on Android.",
-      );
-      setCamera(false);
-      return;
-    }
-
     let stream: MediaStream | null = null;
     let timer: number | undefined;
     let stopped = false;
-    const detector = new Detector({ formats: ["qr_code"] });
+    const canvas = document.createElement("canvas");
+    // One label may sit in frame for many ticks. Keyed on the raw codewords:
+    // every current label has the same text.
     const seen = new Set<string>();
 
     (async () => {
@@ -167,19 +154,29 @@ export function PrintScanner({
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
-        timer = window.setInterval(async () => {
-          if (!videoRef.current || videoRef.current.readyState < 2) return;
-          try {
-            const found = await detector.detect(videoRef.current);
-            for (const code of found) {
-              // One label may sit in frame for many ticks.
-              if (seen.has(code.rawValue)) continue;
-              seen.add(code.rawValue);
-              void submit(code.rawValue);
-            }
-          } catch {
-            /* a bad frame is not worth reporting */
-          }
+        // Loaded on demand: the decoder is sizeable and most visits to this
+        // page never open the camera.
+        const { decodeFrame, luminance } = await import("@/lib/readLabel.ts");
+        if (stopped) return;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("no canvas");
+
+        timer = window.setInterval(() => {
+          const video = videoRef.current;
+          if (!video || video.readyState < 2 || !video.videoWidth) return;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          context.drawImage(video, 0, 0);
+          const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+          const scan = decodeFrame(luminance(frame.data), frame.width, frame.height);
+          if (!scan) return;
+
+          const key = scan.rawBytes
+            ? Array.from(scan.rawBytes, (b) => b.toString(16).padStart(2, "0")).join("")
+            : scan.text;
+          if (seen.has(key)) return;
+          seen.add(key);
+          void submit(scan);
         }, 400);
       } catch {
         setCameraError("The camera could not be opened.");
@@ -228,7 +225,7 @@ export function PrintScanner({
           // Cleared before the request, so the credential is not left sitting
           // in a field on a shared factory terminal.
           field.value = "";
-          void submit(value);
+          void submit({ text: value });
         }}
       >
         <label>

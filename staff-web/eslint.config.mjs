@@ -18,6 +18,8 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Upstream code, kept byte-for-byte apart from its export. See its header.
+      "lib/vendor/**",
     ],
   },
 ];

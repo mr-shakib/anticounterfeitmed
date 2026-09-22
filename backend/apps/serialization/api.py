@@ -16,6 +16,8 @@ from rest_framework.decorators import (
 )
 from rest_framework.response import Response
 
+from medcrypto import labels
+
 from apps.catalog.models import Batch
 from apps.organizations.permissions import STAFF_AUTH, IsManufacturerStaff, owns
 from apps.qc.services import batch_manufacturing_progress
@@ -26,6 +28,24 @@ from apps.serialization.services import (
     create_print_job,
     reconcile_print_job,
 )
+
+
+def label_entry(external_reference: str, token: str) -> dict:
+    """One label as the portal needs it to draw the printed symbol.
+
+    The symbol's data codewords rather than a URL: a generic scanner reads only
+    the public URL from the printed code, and the token rides after it where
+    only our own readers look (see ``medcrypto.labels``). Drawing the symbol is
+    left to the portal, which has to render thousands of them anyway.
+    """
+    return {
+        "external_reference": external_reference,
+        "qr": {
+            "version": labels.SYMBOL_VERSION,
+            "error_correction": labels.ERROR_CORRECTION,
+            "data_codewords": labels.data_codewords(token).hex(),
+        },
+    }
 
 
 class PrintJobSerializer(serializers.ModelSerializer):
@@ -101,14 +121,11 @@ def print_jobs(request):
             # Returned once. Nothing can recover these afterwards, so the
             # client must write the export before discarding the response.
             "label_export": [
-                {
-                    "external_reference": unit.external_reference,
-                    "qr_url": f"https://anticounterfeitmed.com/#v=1&t={unit.token}",
-                }
+                label_entry(unit.external_reference, unit.token)
                 for unit in result.units
             ],
             "export_notice": (
-                "These URLs are shown once and cannot be retrieved again. "
+                "These labels are shown once and cannot be retrieved again. "
                 "Save the export now, print from it, and delete it within 24 "
                 "hours of reconciling the job."
             ),
@@ -207,7 +224,7 @@ def print_job_export(request, job_id):
         )
 
     try:
-        labels = decrypt_export(job.export_ciphertext)
+        retained = decrypt_export(job.export_ciphertext)
     except ExportUnavailable as exc:
         return Response(
             {"code": "EXPORT_UNAVAILABLE", "detail": str(exc)},
@@ -218,11 +235,8 @@ def print_job_export(request, job_id):
         {
             "print_job": PrintJobSerializer(job).data,
             "label_export": [
-                {
-                    "external_reference": entry["external_reference"],
-                    "qr_url": f"https://anticounterfeitmed.com/#v=1&t={entry['token']}",
-                }
-                for entry in labels
+                label_entry(entry["external_reference"], entry["token"])
+                for entry in retained
             ],
             "export_notice": (
                 "Retrievable until "

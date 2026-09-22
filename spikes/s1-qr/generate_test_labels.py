@@ -7,6 +7,11 @@ of the printer is the size it claims to be. Print at 100% scale with no fitting
 or margins applied by the print dialog, then measure one label with callipers
 before trusting the sheet.
 
+Each label is the production label symbol (medcrypto/labels.py): an ordinary
+scanner reads only the public URL, and the token rides in the same symbol for
+the app to read. At level Q that is the exact symbol production prints; the M
+row uses the same layout at the smallest version M allows, for comparison.
+
 The footprint includes the 4-module quiet zone, as the SRS requires. Output goes
 to ``out/``, which is git-ignored: these labels carry real-format tokens and must
 never be committed.
@@ -16,14 +21,13 @@ from __future__ import annotations
 
 import argparse
 import csv
-import io
 from pathlib import Path
 
-import segno
+from qrcodegen import QrCode
 
 from medcrypto import generate_token, hash_token
+from medcrypto import labels
 
-HOST = "https://anticounterfeitmed.com"
 QUIET_ZONE_MODULES = 4
 LABELS_PER_COMBINATION = 20
 SIZES_MM = (20, 25)
@@ -32,27 +36,40 @@ ERROR_LEVELS = ("M", "Q")
 OUT = Path(__file__).parent / "out"
 
 
-def build_url(token: str) -> str:
-    return f"{HOST}/#v=1&t={token}"
+ECC = {"M": QrCode.Ecc.MEDIUM, "Q": QrCode.Ecc.QUARTILE}
 
 
-def qr_svg(url: str, error: str, footprint_mm: float) -> tuple[str, float, int]:
+def label_symbol(token: str, error: str) -> QrCode:
+    """The label symbol for a token, at the smallest version that holds it."""
+    for version in range(1, 10):
+        capacity = QrCode._get_num_data_codewords(version, ECC[error])
+        try:
+            data = labels.data_codewords(token, capacity=capacity)
+        except ValueError:
+            continue
+        return QrCode(version, ECC[error], list(data), -1)
+    raise ValueError("label does not fit a version 1-9 symbol")
+
+
+def qr_svg(token: str, error: str, footprint_mm: float) -> tuple[str, float, int]:
     """Return an SVG sized to an exact footprint, with its module size in mm."""
-    qr = segno.make(url, error=error, boost_error=False)
-    modules = qr.symbol_size(scale=1, border=0)[0]
-    total_modules = modules + 2 * QUIET_ZONE_MODULES
+    qr = label_symbol(token, error)
+    total_modules = qr.get_size() + 2 * QUIET_ZONE_MODULES
     module_mm = footprint_mm / total_modules
 
-    buf = io.BytesIO()
-    qr.save(
-        buf,
-        kind="svg",
-        border=QUIET_ZONE_MODULES,
-        unit="mm",
-        scale=module_mm,
-        xmldecl=False,
+    path = "".join(
+        f"M{x + QUIET_ZONE_MODULES},{y + QUIET_ZONE_MODULES}h1v1h-1z"
+        for y in range(qr.get_size())
+        for x in range(qr.get_size())
+        if qr.get_module(x, y)
     )
-    return buf.getvalue().decode("utf-8"), module_mm, total_modules
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{footprint_mm}mm" '
+        f'height="{footprint_mm}mm" viewBox="0 0 {total_modules} {total_modules}" '
+        f'shape-rendering="crispEdges"><rect width="{total_modules}" '
+        f'height="{total_modules}" fill="#fff"/><path d="{path}" fill="#000"/></svg>'
+    )
+    return svg, module_mm, total_modules
 
 
 def main() -> None:
@@ -73,7 +90,7 @@ def main() -> None:
             for index in range(1, args.per_combination + 1):
                 token = generate_token()
                 reference = f"T{size_mm}{error}-{index:03d}"
-                svg, module_mm, total_modules = qr_svg(build_url(token), error, size_mm)
+                svg, module_mm, total_modules = qr_svg(token, error, size_mm)
 
                 labels_html.append(
                     f'<div class="label">{svg}'

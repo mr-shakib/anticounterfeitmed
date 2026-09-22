@@ -15,6 +15,8 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from medcrypto import labels
+
 from apps.catalog.models import Batch, Product
 from apps.organizations import mfa
 from apps.organizations.models import (
@@ -396,14 +398,18 @@ def test_label_export_is_returned_once_and_never_again(make_manufacturer):
     assert response.status_code == 201
     export = response.data["label_export"]
     assert len(export) == 3
-    assert all(e["qr_url"].startswith("https://anticounterfeitmed.com/#v=1&t=") for e in export)
+    tokens = [
+        labels.token_from_data_codewords(bytes.fromhex(e["qr"]["data_codewords"]))
+        for e in export
+    ]
+    assert all(tokens), "an exported symbol does not carry a token"
+    assert all(e["qr"]["version"] == 6 and e["qr"]["error_correction"] == "Q" for e in export)
 
     # Nothing else exposes a token: the unit listing has no way to return one.
     units = client.get(reverse("staff-batch-units", args=[actor["batch"].id]))
     assert units.status_code == 200
     body = str(units.data)
-    for entry in export:
-        token = entry["qr_url"].split("t=")[1]
+    for token in tokens:
         assert token not in body, "a token was retrievable after issuance"
 
 

@@ -9,34 +9,57 @@
  * endpoint and is never stored, rendered, or put in a URL.
  */
 
+import { PUBLIC_URL, tokenFromDataCodewords } from "./labelSymbol.ts";
+
 const EXPECTED_HOST = "anticounterfeitmed.com";
 const EXPECTED_VERSION = "1";
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
+export type Scan = {
+  /** What the decoder read as text. A keyboard-wedge scanner gives only this. */
+  text: string;
+  /** The symbol's data codewords, from a decoder that exposes them. */
+  rawBytes?: Uint8Array | null;
+};
+
+export type ScanReading =
+  | { kind: "token"; token: string }
+  /** One of our labels, read by something that only reports text. */
+  | { kind: "public-only" }
+  | { kind: "not-ours" };
+
 /**
- * Returns the token from a scanned label, or null when it is not one of ours.
+ * Reads a token from a scanned label.
  *
- * Accepts the printed URL, or a bare token: a keyboard-wedge scanner
- * configured to strip the prefix types only the code.
+ * Current labels carry the token only in the codewords, so the camera is the
+ * way to scan them. The original format -- the token in the URL fragment, or a
+ * bare token from a scanner set to strip the prefix -- is still accepted here,
+ * so labels printed before the change can be scanned on their own line.
  */
-export function tokenFromScan(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  if (TOKEN.test(trimmed)) return trimmed;
+export function readScan({ text, rawBytes }: Scan): ScanReading {
+  if (rawBytes) {
+    const token = tokenFromDataCodewords(rawBytes, text || null);
+    if (token) return { kind: "token", token };
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) return { kind: "not-ours" };
+  if (trimmed === PUBLIC_URL) return { kind: "public-only" };
+  if (TOKEN.test(trimmed)) return { kind: "token", token: trimmed };
 
   let url: URL;
   try {
     url = new URL(trimmed);
   } catch {
-    return null;
+    return { kind: "not-ours" };
   }
 
-  if (url.protocol !== "https:") return null;
-  if (url.hostname.toLowerCase() !== EXPECTED_HOST) return null;
+  if (url.protocol !== "https:") return { kind: "not-ours" };
+  if (url.hostname.toLowerCase() !== EXPECTED_HOST) return { kind: "not-ours" };
 
   const fields = new URLSearchParams(url.hash.replace(/^#/, ""));
-  if (fields.get("v") !== EXPECTED_VERSION) return null;
+  if (fields.get("v") !== EXPECTED_VERSION) return { kind: "not-ours" };
 
   const token = fields.get("t");
-  return token && TOKEN.test(token) ? token : null;
+  return token && TOKEN.test(token) ? { kind: "token", token } : { kind: "not-ours" };
 }

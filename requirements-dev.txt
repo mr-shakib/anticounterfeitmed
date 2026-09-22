@@ -11,5 +11,11 @@ fastapi==0.141.1
 uvicorn[standard]==0.53.0
 
 # QR label generation for the physical test sheet, and brand asset resizing.
-segno==1.6.6
+# qrcodegen because it draws a symbol from raw data codewords, which the label
+# format needs (see medcrypto/labels.py); text-only encoders cannot produce it.
+qrcodegen==1.8.0
 Pillow==12.3.0
+
+# An independent, widely deployed QR decoder: the label tests use it to check
+# that an ordinary scanner reads only the public URL from a printed label.
+zxing-cpp==3.1.1

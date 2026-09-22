@@ -1,0 +1,8 @@
+{
+  "name": "longer-url",
+  "description": "Our URL with a path appended, carrying a well-formed record.",
+  "check": "label",
+  "data_codewords": "42068747470733a2f2f616e7469636f756e746572666569746d65642e636f6d2f7804d56020b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ec11ec11ec11ec",
+  "text": "https://anticounterfeitmed.com/x",
+  "expected": "INVALID"
+}

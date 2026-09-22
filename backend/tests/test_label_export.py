@@ -42,13 +42,13 @@ def test_export_is_retrievable_after_leaving_the_page(make_manufacturer):
         format="json",
     )
     assert created.status_code == 201
-    issued = {e["qr_url"] for e in created.data["label_export"]}
+    issued = {e["qr"]["data_codewords"] for e in created.data["label_export"]}
     job_id = created.data["print_job"]["id"]
 
     # A completely separate request, as if the page had been closed and reopened.
     again = client.get(reverse("staff-print-job-export", args=[job_id]))
     assert again.status_code == 200
-    assert {e["qr_url"] for e in again.data["label_export"]} == issued
+    assert {e["qr"]["data_codewords"] for e in again.data["label_export"]} == issued
 
 
 @pytest.mark.django_db(transaction=True)

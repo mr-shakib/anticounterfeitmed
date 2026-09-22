@@ -1,0 +1,9 @@
+{
+  "name": "valid-label-no-text",
+  "description": "The same symbol from a decoder that reports raw codewords only.",
+  "check": "label",
+  "data_codewords": "41f68747470733a2f2f616e7469636f756e746572666569746d65642e636f6d2f04d56020b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dde4ec11ec11ec11ec11",
+  "text": null,
+  "expected": "VALID",
+  "token": "CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM_W3eQ"
+}

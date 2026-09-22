@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import JSZip from "jszip";
-import QRCode from "qrcode";
+import { SYMBOL_MODULES, symbolSvg, type LabelSymbol } from "@/lib/labelSymbol.ts";
 
 /**
  * Renders the generated labels as QR codes, and as a print-ready sheet.
  *
- * The codes are drawn in the browser from URLs this page already holds, so
- * nothing extra is sent anywhere and the tokens are not written to a server.
+ * The codes are drawn in the browser from the symbol data this page already
+ * holds, so nothing extra is sent anywhere and the tokens are not written to a
+ * server. An ordinary scanner reads only the public URL from these codes; the
+ * token is in the symbol where only our own readers look (lib/labelSymbol.ts).
  *
  * Sizing follows docs/11: the footprint includes the four-module quiet zone, and
  * no logo goes inside the symbol. At a 20mm footprint with error correction Q
- * each module is about 0.377mm, which is the smallest and most print-sensitive
+ * each module is about 0.408mm, which is the smallest and most print-sensitive
  * combination in the matrix -- print at 100% scale and measure one with
  * callipers before committing to a run.
  */
 
-export type LabelEntry = { external_reference: string; qr_url: string };
+export type LabelEntry = { external_reference: string; qr: LabelSymbol };
 
 const EC_LEVEL = "Q" as const;
-const QUIET_ZONE_MODULES = 4;
 
 /** Footprints offered, in millimetres. */
 export const LABEL_SIZES_MM = [5, 8, 10, 12, 15, 20, 25] as const;
@@ -28,13 +29,13 @@ export const LABEL_SIZES_MM = [5, 8, 10, 12, 15, 20, 25] as const;
 /**
  * How wide one module is at a given footprint, and whether that can be read.
  *
- * The URL fixes the symbol at 53 modules across including the quiet zone, so
- * the footprint alone decides the module size. Below roughly a third of a
+ * The label format fixes the symbol at 49 modules across including the quiet
+ * zone, so the footprint alone decides the module size. Below roughly a third of a
  * millimetre a phone camera struggles, and through a scratched coating it stops
  * working altogether -- which is worth knowing before a press run rather than
  * after one.
  */
-export function moduleAdvice(sizeMm: number, modules = 53) {
+export function moduleAdvice(sizeMm: number, modules = SYMBOL_MODULES) {
   const mm = sizeMm / modules;
   if (mm >= 0.33) return { mm, level: "ok" as const, note: "Readable." };
   if (mm >= 0.25)
@@ -59,12 +60,8 @@ export function moduleAdvice(sizeMm: number, modules = 53) {
 /** How many to draw on screen. A full run can be thousands; the sheet has all. */
 const PREVIEW_LIMIT = 12;
 
-async function renderSvg(url: string): Promise<string> {
-  return QRCode.toString(url, {
-    type: "svg",
-    errorCorrectionLevel: EC_LEVEL,
-    margin: QUIET_ZONE_MODULES,
-  });
+function renderSvg(entry: LabelEntry): string {
+  return symbolSvg(entry.qr);
 }
 
 export function LabelSheet({
@@ -77,18 +74,7 @@ export function LabelSheet({
   sizeMm: number;
 }) {
   const preview = useMemo(() => entries.slice(0, PREVIEW_LIMIT), [entries]);
-  const [svgs, setSvgs] = useState<string[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const rendered = await Promise.all(preview.map((e) => renderSvg(e.qr_url)));
-      if (!cancelled) setSvgs(rendered);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [preview]);
+  const svgs = useMemo(() => preview.map(renderSvg), [preview]);
 
   return (
     <div>
@@ -175,7 +161,7 @@ async function buildSheetHtml(
   batchNumber: string,
   sizeMm: number,
 ): Promise<string> {
-  const svgs = await Promise.all(entries.map((e) => renderSvg(e.qr_url)));
+  const svgs = entries.map(renderSvg);
   const labels = entries
     .map(
       (e, i) =>
@@ -246,7 +232,7 @@ export async function downloadQrArchive(
   const zip = new JSZip();
   const folder = zip.folder(`labels-${batchNumber}`)!;
 
-  const svgs = await Promise.all(entries.map((e) => renderSvg(e.qr_url)));
+  const svgs = entries.map(renderSvg);
   entries.forEach((entry, index) => {
     // The mm size is written onto the SVG so the intended footprint travels
     // with the file rather than living only in an instruction someone forgets.

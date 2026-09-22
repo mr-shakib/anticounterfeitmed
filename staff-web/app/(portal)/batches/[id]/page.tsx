@@ -193,12 +193,12 @@ export default function BatchDetailPage({
 
   const downloadExport = () => {
     if (!exported) return;
-    // References and URLs, for reconciliation and for a printer that prefers
-    // to render the codes itself. The printable sheet is what carries the
-    // actual QR images.
+    // References only, for reconciliation. A code cannot be rebuilt from a line
+    // of text any more -- label software would print the public URL alone --
+    // so the printable sheet and the SVG archive are what carry the codes.
     const rows = [
-      "external_reference,qr_url",
-      ...exported.label_export.map((e) => `${e.external_reference},${e.qr_url}`),
+      "external_reference",
+      ...exported.label_export.map((e) => e.external_reference),
     ].join("\n");
     const url = URL.createObjectURL(new Blob([rows], { type: "text/csv" }));
     const link = document.createElement("a");

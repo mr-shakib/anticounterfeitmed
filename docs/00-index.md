@@ -57,6 +57,7 @@ page cannot drift apart when the mark changes.
 | Receipt outbox worker | **Built** — Celery task, idempotent; a signer failure after commit never undoes a redemption |
 | Pilot deployment config | **Built** — Dockerfiles and compose; signer verified internal-only with no DB credentials |
 | Backup and restore drill | **Built and performed** — encrypted backup, isolated restore; redeemed units survived, the uniqueness index returned, a duplicate first redemption was refused, all credentials re-verified |
+| Label symbol (D21) | **Built** — ordinary scanners read only the public URL; the token rides after the terminator for the app (ML Kit raw codewords) and the portal camera (ZXing). One layout, three parsers, 11 shared vectors. **Needs the on-device check in doc 11 before printing.** |
 | End-to-end chain | Passing — generate → manufacture → activate → preview → confirm, with app-side signature and binding verification |
 | Test suite | 151 backend tests against real PostgreSQL, 22 Flutter tests, 4 on-device live-API tests |
 | Spike S1 (URL/camera) | **Not started** — needs a real domain and phones (decision D3) |

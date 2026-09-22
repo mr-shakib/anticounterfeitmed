@@ -19,7 +19,7 @@ Source: SRS §5.3, §4.3. All paths are proposed contracts; organization- and ob
 | `GET /v1/trust/manifest` | App | Root-signed issuer/service public-key manifest |
 | `POST /v1/products` | Manufacturer | Create product |
 | `POST /v1/batches` | Manufacturer | Create batch |
-| `POST /v1/print-jobs` | Manufacturer | Generate serials/tokens + controlled label export |
+| `POST /v1/print-jobs` | Manufacturer | Generate serials/tokens + controlled label export. Each entry is `{external_reference, qr: {version: 6, error_correction: "Q", data_codewords: <hex>}}` — the symbol's data codewords, never a URL (doc 09, D21). |
 | `POST /v1/print-scans` | Authorized mfr. staff | Read one printed code back on the line. Takes a **raw token**, stores only its digest, and records `PRINTED` as scan evidence. Refused once a unit is past `CREATED`. |
 | `POST /v1/manufacturing-confirmations` | Authorized mfr. staff | Record printed/QC/coated for a whole batch or an exact unit list, with completion time + source reference |
 | `POST /v1/activation-jobs` | Mfr. release manager | Approve / sign / activate eligible units |

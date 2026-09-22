@@ -1,6 +1,6 @@
 /// The camera screen.
 ///
-/// A scanned payload is parsed locally and strictly before anything reaches the
+/// A scanned code is parsed locally and strictly before anything reaches the
 /// network. A code that is not ours is simply not ours: it is never opened as a
 /// link and never sent anywhere.
 library;
@@ -41,10 +41,17 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future<void> _onDetect(BarcodeCapture capture) async {
     if (_handling) return;
-    final raw = capture.barcodes.firstOrNull?.rawValue;
-    if (raw == null) return;
+    final barcode = capture.barcodes.firstOrNull;
+    if (barcode == null) return;
 
-    final scanned = parseScannedPayload(raw);
+    // The token is in the symbol's raw data codewords, not in its text. On
+    // Android, ML Kit reports every data codeword, padding included, and that
+    // is what this depends on: mobile_scanner 7 replaces rawBytes with
+    // rawDecodedBytes, so check the label vectors on a device before upgrading.
+    final scanned = parseScannedBarcode(
+      text: barcode.rawValue,
+      rawBytes: barcode.rawBytes,
+    );
     if (scanned == null) {
       setState(() => _hint = AppScope.of(context).strings.notOurCode);
       return;

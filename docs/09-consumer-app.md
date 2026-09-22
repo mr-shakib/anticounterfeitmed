@@ -13,22 +13,38 @@ Source: SRS §3.4, §4.3. Android first; iOS shares UI code but needs its own na
 | History | This installation's own receipts, **explicitly labeled with their original check times**; refresh current status online |
 | Report concern | Reason, optional packaging photo, optional pharmacy reference/contact, case number, progress |
 
-## URL parsing — strict, local, and first
+## Label parsing — strict, local, and first
 
-Before any network call, the app decodes the scanned URL locally and accepts **only**:
+> **DEVIATION from SRS §2.1, by owner decision (2026-09-22, D21).** The SRS
+> prints the token in the URL fragment, where any scanner shows it, and says the
+> app "does not read a second invisible QR payload". The owner decided an
+> ordinary scanner must see only the public URL. The token now rides in the
+> same symbol, after the point where standard decoders stop reading.
 
-- scheme `https`;
-- the **exact expected host**;
-- the expected fragment version (`v=1`);
-- a valid 32-byte (43-char Base64url) token.
+What the printed symbol holds, and who sees what:
 
-**It never opens an arbitrary scanned URL automatically.** Anything failing these checks is treated as "not one of our codes" — not opened, not sent to the API.
+| Reader | Sees |
+| --- | --- |
+| Phone camera, generic QR app, handheld scanner | `https://anticounterfeitmed.com/` — nothing else |
+| This app (ML Kit raw codewords) | The public URL **and** the token |
+| The portal's print-line camera (ZXing raw codewords) | The public URL **and** the token |
 
-Expected format:
+The layout is defined once, in `libs/medcrypto/medcrypto/labels.py`: a byte-mode segment holding exactly the public URL, the terminator, then the record `"MV"`, version `0x02` and the 32 raw token bytes, then standard padding. Version 6, error correction Q, always. The app reads `Barcode.rawBytes`, which on Android is ML Kit's full data-codeword stream, padding included.
 
-```text
-https://anticounterfeitmed.com/#v=1&t=<43-character-base64url-token>
-```
+Before any network call, the app parses the codewords locally and accepts **only**:
+
+- a byte-mode segment that is **exactly** the public URL, followed by the terminator;
+- the decoder's text reading, when given, equal to that URL;
+- the record marker and version;
+- 32 token bytes, re-encoded to the 43-character Base64url token whose digest the backend stores.
+
+**It never opens an arbitrary scanned URL automatically.** Anything failing these checks is treated as "not one of our codes" — not opened, not sent to the API. The parser must agree with the Python reference on every file in `crypto-vectors/label/`.
+
+**This hides the token from ordinary scanners. It does not make it secret.** Any decoder that exposes raw codewords reads it, and a photocopy of the label is still a working code. Copying before first redemption remains unsolved (doc 07).
+
+**Original-format labels** (`https://anticounterfeitmed.com/#v=1&t=<token>`) are refused by default. A build with `--dart-define=ACCEPT_URL_LABELS=true` accepts them, for a pilot that already printed some; that build also accepts any hand-made URL QR carrying a valid token, which is exactly what the change was meant to stop.
+
+**Do not upgrade `mobile_scanner` to 7.x** without re-running the label vectors on a device: 7.x deprecates `rawBytes`.
 
 ## Verification sequence
 

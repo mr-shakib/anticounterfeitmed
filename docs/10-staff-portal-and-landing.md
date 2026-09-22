@@ -39,7 +39,7 @@ compulsory, removal is an administrator action instead.
 | Product catalog | Brand, generic, strength, dosage form, unit/pack description, manufacturer, reference packaging image, registration reference if available |
 | Batch setup | Product, manufacturer batch number, manufacturing date, **explicit expiry date**, planned unit count |
 | Serialization | Create unique unit IDs/tokens, controlled label export for off-system printing, count issued units |
-| Print-line scan | Read each printed code back, by handheld scanner or camera. Records `PRINTED` as **observed evidence**, not an assertion, and shows a running scanned-of-total count |
+| Print-line scan | Read each printed code back with the device camera (ZXing, which exposes the raw codewords the token rides in). A handheld keyboard-wedge scanner reads only the public URL from current labels and is told to use the camera; it still reads original-format labels. Records `PRINTED` as **observed evidence**, not an assertion, and shows a running scanned-of-total count |
 | Manufacturing readiness | Record printed / QC-passed / rejected / coated / voided for a batch or unit list; show per-step counts and the activation-ready quantity **before** activation is attempted |
 | Activation | Release manager approves **only** QC-passed, covered, unexpired units; signed credential created **before** each unit becomes active |
 | Recall / block | Recall a batch or block units, with reason, effective timestamp, contact instructions |
@@ -95,7 +95,7 @@ comfortably so.
 
 ### Off-system flow the portal supports
 
-1. Staff export generated QR labels + external human-readable unit references for printing outside the platform. **External references cannot redeem units.**
+1. Staff export generated QR labels + external human-readable unit references for printing outside the platform. **External references cannot redeem units.** The export carries each symbol's data codewords, not a URL; the portal draws the symbols (printable sheet, SVG archive). A CSV of references is for reconciliation only — label software cannot rebuild these codes from text.
 2. Printing personnel do physical readability checks with existing equipment, then apply the scratch layer. **These scans do not call any platform endpoint.**
 3. Staff record completion of printing, QC, and coating.
 4. Rejected units recorded void.

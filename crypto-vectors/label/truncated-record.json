@@ -1,0 +1,8 @@
+{
+  "name": "truncated-record",
+  "description": "The codewords end partway through the token.",
+  "check": "label",
+  "data_codewords": "41f68747470733a2f2f616e7469636f756e746572666569746d65642e636f6d2f04d56020b121920272e353c434a51585f666d74",
+  "text": "https://anticounterfeitmed.com/",
+  "expected": "INVALID"
+}

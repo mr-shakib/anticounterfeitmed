@@ -6,7 +6,8 @@ COMPOSE := docker compose -f infra/docker-compose.dev.yml
 .PHONY: help \
         up down stop migrate \
         serve serve-nomfa seed staff staff-code operator \
-        test vectors vectors-regen crosscheck leakcheck check \
+        test vectors vectors-regen label-vectors crosscheck leakcheck \
+        portal-test app-test check \
         apk apk-dev labels brand landing-csp \
         backup restore-drill
 
@@ -68,13 +69,22 @@ vectors:  ## Verify the golden crypto vectors
 vectors-regen:  ## Regenerate the golden vectors (only when a schema changes)
 	$(PY) crypto-vectors/generate.py
 
+label-vectors:  ## Regenerate the label-symbol vectors (only when the label layout changes)
+	$(PY) crypto-vectors/generate_labels.py
+
+portal-test:  ## Run the portal's label tests against the shared vectors
+	cd staff-web && npm test
+
+app-test:  ## Run the consumer app's unit tests, label vectors included
+	cd consumer-app && flutter test
+
 crosscheck:  ## Verify the vectors with the system OpenSSL binary
 	./crypto-vectors/crosscheck_openssl.sh
 
 leakcheck:  ## Fail if anything resembling a raw token is tracked by git
 	./scripts/check_no_token_leak.sh
 
-check: test vectors crosscheck leakcheck  ## Everything CI runs
+check: test vectors crosscheck leakcheck portal-test app-test  ## Everything CI runs
 	@echo "all checks passed"
 
 # --- build artefacts --------------------------------------------------------

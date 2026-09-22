@@ -15,6 +15,7 @@ import json
 import sys
 from pathlib import Path
 
+from medcrypto import labels
 from medcrypto.canonical import CanonicalisationError, parse_strict
 from medcrypto.contexts import Context
 from medcrypto.records import BindingError, check_activation_binding
@@ -80,6 +81,16 @@ def run_binding_vector(vector: dict) -> bool:
     return vector["expected"] == "VALID"
 
 
+def run_label_vector(vector: dict) -> bool:
+    """A label vector must reach its verdict, and a valid one its exact token."""
+    token = labels.token_from_data_codewords(
+        bytes.fromhex(vector["data_codewords"]), text=vector["text"]
+    )
+    if vector["expected"] == "VALID":
+        return token is not None and token == vector["token"]
+    return token is None
+
+
 def main() -> int:
     files = sorted(HERE.glob("*/*.json"))
     if not files:
@@ -94,6 +105,7 @@ def main() -> int:
             "signature": run_signature_vector,
             "parse": run_parse_vector,
             "binding": run_binding_vector,
+            "label": run_label_vector,
         }[check]
         passed = runner(vector)
         status = "ok  " if passed else "FAIL"

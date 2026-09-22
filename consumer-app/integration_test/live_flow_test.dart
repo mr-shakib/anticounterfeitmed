@@ -20,6 +20,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../test/support/label_codewords.dart';
+
 const rootKey = String.fromEnvironment('ROOT_PUBLIC_KEY');
 const token = String.fromEnvironment('TEST_TOKEN');
 const baseUrl = String.fromEnvironment(
@@ -40,9 +42,11 @@ void main() {
     );
   });
 
-  testWidgets('the printed URL parses to the expected token', (_) async {
-    final scanned =
-        parseScannedPayload('https://anticounterfeitmed.com/#v=1&t=$token');
+  testWidgets('the printed label parses to the expected token', (_) async {
+    final scanned = parseScannedBarcode(
+      text: publicUrl,
+      rawBytes: labelCodewords(token),
+    );
     expect(scanned, isNotNull);
     expect(scanned!.token, equals(token));
   });
