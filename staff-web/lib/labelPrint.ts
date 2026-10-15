@@ -6,9 +6,9 @@
  * the top-left corner of the page, measured on the footprint -- the symbol
  * with its quiet zone.
  *
- * By default a sheet carries nothing but the codes. A header and the unit
- * references are added only when the organization's layout asks for them
- * (Settings, served by /v1/staff/label-layout).
+ * By default a sheet carries the codes and, under each, its short serial
+ * (shortSerial). The serials can be turned off, and a header added, in the
+ * organization's layout (Settings, served by /v1/staff/label-layout).
  */
 
 import { symbolSvg, type LabelSymbol } from "./labelSymbol.ts";
@@ -27,10 +27,11 @@ export type LabelLayout = {
   show_header: boolean;
   /** `{batch}` and `{count}` are filled in for each run. */
   header_text: string;
+  /** Print each code's short serial under it. */
   show_reference: boolean;
 };
 
-/** What the server hands out until a layout is saved. Codes only, 15 mm apart. */
+/** What the server hands out until a layout is saved: codes 15 mm apart, each with its serial. */
 export const DEFAULT_LABEL_LAYOUT: LabelLayout = {
   page_size: "A4",
   page_margin_mm: 10,
@@ -38,8 +39,11 @@ export const DEFAULT_LABEL_LAYOUT: LabelLayout = {
   footprint_mm: 20,
   show_header: false,
   header_text: "",
-  show_reference: false,
+  show_reference: true,
 };
+
+/** Footprints offered, in millimetres; the server accepts the same. */
+export const LABEL_SIZES_MM = [5, 8, 10, 12, 15, 20, 25] as const;
 
 export const PAGE_SIZES: Record<PageSize, { width: number; height: number; name: string }> = {
   A4: { width: 210, height: 297, name: "A4" },
@@ -48,12 +52,41 @@ export const PAGE_SIZES: Record<PageSize, { width: number; height: number; name:
 
 /** Space the header takes at the top of each page, when shown. */
 export const HEADER_BAND_MM = 8;
-/** Space a reference takes under its code, when shown. */
-export const CAPTION_BAND_MM = 3;
-/** Between the bottom of a footprint and the top of its reference. */
+/** Between the bottom of a footprint and the top of its serial. */
 export const CAPTION_OFFSET_MM = 0.8;
 export const HEADER_FONT_PT = 9;
-export const CAPTION_FONT_PT = 6;
+const PT_PER_MM = 72 / 25.4;
+/** A monospace digit advances 0.6 em. */
+export const MONO_ADVANCE = 0.6;
+/** The serial takes at most this share of its code's width... */
+const CAPTION_MAX_SHARE = 0.6;
+/** ...even at six digits, a batch of 100,000 units or more. */
+const CAPTION_MAX_CHARS = 6;
+const CAPTION_MAX_PT = 8;
+
+/**
+ * The serial printed under a code: the unit's number within its batch, at
+ * least four digits. References are `{batch}-{index:06d}`, so 000042 is 0042;
+ * it is unique within the batch, not across batches.
+ */
+export function shortSerial(reference: string): string {
+  const match = /-(\d+)$/.exec(reference);
+  return match ? String(Number(match[1])).padStart(4, "0") : reference.slice(-5);
+}
+
+/**
+ * The serial's size for a footprint: up to 8 pt, and small enough that even a
+ * six-digit serial is narrower than the code. In half points.
+ */
+export function captionFontPt(footprintMm: number): number {
+  const fit = (CAPTION_MAX_SHARE * footprintMm * PT_PER_MM) / (CAPTION_MAX_CHARS * MONO_ADVANCE);
+  return Math.floor(Math.min(CAPTION_MAX_PT, fit) * 2) / 2;
+}
+
+/** Space a serial takes under its code, when shown. */
+export function captionBandMm(footprintMm: number): number {
+  return CAPTION_OFFSET_MM + captionFontPt(footprintMm) / PT_PER_MM + 0.2;
+}
 
 const DEFAULT_HEADER = "Batch {batch}";
 
@@ -76,10 +109,10 @@ export type SheetPlan = {
  *
  * The grid is centred across the page: the margin is the least space at
  * either side, and whatever a whole column cannot use is split evenly between
- * the two. A short last row keeps to the same columns. Neighbouring footprints are exactly `gap_mm` apart across, and down when no
- * references are shown; a reference sits in its own label's cell, so the gap is
- * measured from the bottom of the reference to the next code. Throws when not
- * even one label fits.
+ * the two. A short last row keeps to the same columns. Neighbouring footprints
+ * are exactly `gap_mm` apart across, and down when no serials are shown; a
+ * serial sits in its own label's cell, so the gap is measured from the bottom
+ * of the serial to the next code. Throws when not even one label fits.
  */
 export function planSheet(count: number, layout: LabelLayout): SheetPlan {
   const { width, height } = PAGE_SIZES[layout.page_size];
@@ -87,7 +120,7 @@ export function planSheet(count: number, layout: LabelLayout): SheetPlan {
   const gap = layout.gap_mm;
   const margin = layout.page_margin_mm;
   const top = margin + (layout.show_header ? HEADER_BAND_MM : 0);
-  const cellHeight = size + (layout.show_reference ? CAPTION_BAND_MM : 0);
+  const cellHeight = size + (layout.show_reference ? captionBandMm(size) : 0);
   // Tolerates the float error in, say, 5 * 35 - 15 against 190.
   const slack = 1e-6;
 
@@ -141,8 +174,8 @@ const mm = (value: number) => `${Number(value.toFixed(3))}mm`;
  * Each page is drawn at its full paper size and the printed page itself has no
  * margin, so the margin is the layout's own and the browser has nowhere to put
  * its date, address and page number. Everything that reaches the page from a
- * person -- batch number, references, header -- is escaped: the sheet opens in
- * a window belonging to the portal.
+ * person -- batch number, serials, header -- is escaped: the sheet opens in a
+ * window belonging to the portal.
  */
 export function buildSheetHtml(
   entries: LabelEntry[],
@@ -163,11 +196,11 @@ export function buildSheetHtml(
           const code =
             `<div class="qr" style="left:${mm(x)};top:${mm(y)}">` +
             `${symbolSvg(entries[index].qr)}</div>`;
-          const reference = layout.show_reference
+          const serial = layout.show_reference
             ? `<div class="ref" style="left:${mm(x + size / 2)};top:${mm(y + size + CAPTION_OFFSET_MM)}">` +
-              `${escapeHtml(entries[index].external_reference)}</div>`
+              `${escapeHtml(shortSerial(entries[index].external_reference))}</div>`
             : "";
-          return code + reference;
+          return code + serial;
         })
         .join("");
       return `<section class="page">${header}${labels}</section>`;
@@ -189,7 +222,7 @@ export function buildSheetHtml(
   .qr { position: absolute; width: ${mm(size)}; height: ${mm(size)}; }
   .qr svg { display: block; width: 100%; height: 100%; }
   .ref { position: absolute; transform: translateX(-50%); white-space: nowrap; color: #000;
-         font: ${CAPTION_FONT_PT}pt/1 ui-monospace, Menlo, Consolas, monospace; }
+         font: ${captionFontPt(size)}pt/1 ui-monospace, Menlo, Consolas, monospace; }
   .head { position: absolute; white-space: nowrap; color: #000;
           font: ${HEADER_FONT_PT}pt/1 system-ui, Helvetica, Arial, sans-serif; }
   @media screen {

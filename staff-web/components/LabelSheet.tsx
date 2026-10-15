@@ -5,11 +5,14 @@ import { useMemo } from "react";
 import JSZip from "jszip";
 import { SYMBOL_MODULES, symbolSvg } from "@/lib/labelSymbol.ts";
 import { buildSheetPdf } from "@/lib/labelPdf.ts";
+import { buildLabelWorkbook } from "@/lib/labelXlsx.ts";
 import {
+  LABEL_SIZES_MM,
   PAGE_SIZES,
   buildSheetHtml,
   headerText,
   planSheet,
+  shortSerial,
   type LabelEntry,
   type LabelLayout,
 } from "@/lib/labelPrint.ts";
@@ -33,8 +36,7 @@ export type { LabelEntry };
 
 const EC_LEVEL = "Q" as const;
 
-/** Footprints offered, in millimetres. */
-export const LABEL_SIZES_MM = [5, 8, 10, 12, 15, 20, 25] as const;
+export { LABEL_SIZES_MM };
 
 /**
  * How wide one module is at a given footprint, and whether that can be read.
@@ -76,7 +78,7 @@ function renderSvg(entry: LabelEntry): string {
 
 /**
  * `layout` is the organization's sheet layout, with the footprint chosen for
- * this run. The preview uses its spacing and shows references only when the
+ * this run. The preview uses its spacing and shows serials only when the
  * sheet will, so what is on screen is what goes to the printer.
  */
 export function LabelSheet({
@@ -113,7 +115,7 @@ export function LabelSheet({
               dangerouslySetInnerHTML={{ __html: svgs[index] ?? "" }}
             />
             {layout.show_reference && (
-              <figcaption className="mono">{entry.external_reference}</figcaption>
+              <figcaption className="mono">{shortSerial(entry.external_reference)}</figcaption>
             )}
           </figure>
         ))}
@@ -150,7 +152,7 @@ export function LabelSheet({
           {layout.show_header
             ? `Header on each page: “${headerText(layout, batchNumber, entries.length)}”. `
             : "No header. "}
-          {layout.show_reference ? "References under each code. " : "No references. "}
+          {layout.show_reference ? "Serial number under each code. " : "No serial numbers. "}
           <Link href="/settings">Change the layout in Settings.</Link>
         </p>
       ) : (
@@ -175,6 +177,15 @@ export function LabelSheet({
             onClick={() => void downloadSheetPdf(entries, batchNumber, layout)}
           >
             Download sheet (PDF)
+          </button>
+        </div>
+        <div className="shrink">
+          <button
+            className="secondary"
+            disabled={!plan}
+            onClick={() => void downloadWorkbook(entries, batchNumber, layout)}
+          >
+            Download codes (Excel)
           </button>
         </div>
         <div className="shrink">
@@ -216,6 +227,25 @@ export function downloadPrintableSheet(
 ) {
   const html = buildSheetHtml(entries, batchNumber, layout);
   saveBlob(new Blob([html], { type: "text/html" }), `labels-${batchNumber}.html`);
+}
+
+/**
+ * Downloads the codes as an Excel workbook: one picture per code, one code
+ * per row, with its serial under it when the layout shows serials. Never a
+ * header or a full reference.
+ */
+export async function downloadWorkbook(
+  entries: LabelEntry[],
+  batchNumber: string,
+  layout: LabelLayout,
+) {
+  const bytes = await buildLabelWorkbook(entries, layout);
+  saveBlob(
+    new Blob([bytes as Uint8Array<ArrayBuffer>], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `labels-${batchNumber}.xlsx`,
+  );
 }
 
 /** Downloads the sheet as a PDF, with its page size and positions fixed. */

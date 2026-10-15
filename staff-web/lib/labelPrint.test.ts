@@ -13,8 +13,13 @@ import { test } from "node:test";
 
 import {
   DEFAULT_LABEL_LAYOUT,
+  LABEL_SIZES_MM,
+  MONO_ADVANCE,
   buildSheetHtml,
+  captionBandMm,
+  captionFontPt,
   planSheet,
+  shortSerial,
   type LabelEntry,
   type LabelLayout,
 } from "./labelPrint.ts";
@@ -31,7 +36,8 @@ const valid = readdirSync(VECTORS)
 
 const entries = (count: number): LabelEntry[] =>
   Array.from({ length: count }, (_, i) => ({
-    external_reference: `REF-${String(i).padStart(5, "0")}`,
+    // As the backend issues them: batch number, then the unit's index.
+    external_reference: `BN-1-${String(i + 1).padStart(6, "0")}`,
     qr: { version: 6, error_correction: "Q", data_codewords: valid.data_codewords },
   }));
 
@@ -41,6 +47,7 @@ const withText: LabelLayout = {
   header_text: "Batch {batch} — {count} labels",
   show_reference: true,
 };
+const codesOnly: LabelLayout = { ...DEFAULT_LABEL_LAYOUT, show_reference: false };
 
 test("the defaults match the server's", () => {
   // Pinned on the other side in backend/tests/test_label_layout.py.
@@ -51,8 +58,25 @@ test("the defaults match the server's", () => {
     footprint_mm: 20,
     show_header: false,
     header_text: "",
-    show_reference: false,
+    show_reference: true,
   });
+});
+
+test("the serial is the unit's number in its batch, at least four digits", () => {
+  assert.equal(shortSerial("PAN-BAT-20261001-000042"), "0042");
+  assert.equal(shortSerial("PAN-BAT-20261001-012345"), "12345");
+  assert.equal(shortSerial("BN-1-000001"), "0001");
+  assert.equal(shortSerial("BN-1-123456"), "123456");
+});
+
+test("at every footprint a serial is narrower than its code", () => {
+  for (const size of LABEL_SIZES_MM) {
+    const pt = captionFontPt(size);
+    const widestMm = (6 * MONO_ADVANCE * pt * 25.4) / 72;
+    assert.ok(pt > 0 && pt <= 8, `${size} mm: ${pt} pt`);
+    assert.ok(widestMm <= 0.6 * size + 1e-9, `${size} mm: six digits are ${widestMm} mm`);
+  }
+  assert.equal(captionFontPt(20), 8);
 });
 
 /** Clear space between two labels' cells; the larger of the two axes. */
@@ -64,13 +88,14 @@ function clearance(a: { x: number; y: number }, b: { x: number; y: number }, w: 
 
 for (const layout of [
   DEFAULT_LABEL_LAYOUT,
+  codesOnly,
   withText,
   { ...DEFAULT_LABEL_LAYOUT, page_size: "LETTER" as const, footprint_mm: 12, gap_mm: 22.5 },
 ]) {
   test(`codes keep their distance and stay inside the margins (${JSON.stringify(layout)})`, () => {
     const plan = planSheet(200, layout);
     const size = layout.footprint_mm;
-    const cell = size + (layout.show_reference ? 3 : 0);
+    const cell = size + (layout.show_reference ? captionBandMm(size) : 0);
 
     assert.equal(plan.pages.flat().length, 200);
     const right = Math.max(...plan.pages[0].map((p) => p.x)) + size;
@@ -89,8 +114,9 @@ for (const layout of [
   });
 }
 
-test("the default A4 page holds 5 × 8 codes of 20 mm, centred", () => {
-  const plan = planSheet(41, DEFAULT_LABEL_LAYOUT);
+test("an A4 page holds 5 × 8 codes of 20 mm, centred; 5 × 7 with serials", () => {
+  assert.equal(planSheet(1, DEFAULT_LABEL_LAYOUT).rows, 7);
+  const plan = planSheet(41, codesOnly);
   assert.equal(plan.columns, 5);
   assert.equal(plan.rows, 8);
   assert.equal(plan.pages.length, 2);
@@ -114,22 +140,31 @@ function visibleText(html: string) {
     .trim();
 }
 
-test("by default the HTML sheet carries the codes and nothing else", () => {
+test("by default the HTML sheet carries the codes and their serials, nothing else", () => {
   const html = buildSheetHtml(entries(45), "BN-1", DEFAULT_LABEL_LAYOUT);
+  const serials = Array.from({ length: 45 }, (_, i) => String(i + 1).padStart(4, "0"));
 
-  assert.equal(visibleText(html), "");
+  assert.equal(visibleText(html).replace(/\s+/g, ""), serials.join(""));
   assert.equal(html.match(/<svg/g)?.length, 45);
   assert.equal(html.match(/class="page"/g)?.length, 2);
   assert.match(html, /@page \{ size: 210mm 297mm; margin: 0; \}/);
+  assert.match(html, /font: 8pt\/1 ui-monospace/);
 });
 
-test("a header and references appear when the layout asks for them", () => {
+test("with serials turned off the HTML sheet carries the codes alone", () => {
+  assert.equal(visibleText(buildSheetHtml(entries(45), "BN-1", codesOnly)), "");
+});
+
+test("a header appears when the layout asks for one", () => {
   const html = buildSheetHtml(entries(45), "BN-1", withText);
   const text = visibleText(html);
 
+  const serials = [...html.matchAll(/class="ref"[^>]*>([^<]*)</g)].map((m) => m[1]);
+
   assert.equal(text.split("Batch BN-1 — 45 labels").length - 1, 2, "one header per page");
-  assert.match(text, /REF-00000/);
-  assert.match(text, /REF-00044/);
+  assert.equal(serials.length, 45);
+  assert.deepEqual([serials[0], serials[44]], ["0001", "0045"]);
+  assert.ok(!text.includes("BN-1-0000"), "never the full reference");
 });
 
 test("anything a person typed is escaped", () => {
@@ -144,19 +179,30 @@ test("anything a person typed is escaped", () => {
 
 const text = async (blob: Blob) => Buffer.from(await blob.arrayBuffer()).toString("latin1");
 
-test("by default the PDF has no text at all", async () => {
+test("by default the PDF's only text is each code's serial, centred under it", async () => {
   const pdf = await text(await buildSheetPdf(entries(45), "BN-1", DEFAULT_LABEL_LAYOUT, { compress: false }));
+  const shown = [...pdf.matchAll(/BT \/F2 ([\d.]+) Tf ([\d.]+) [\d.]+ Td \((\d+)\) Tj ET/g)];
 
-  assert.ok(!/\bTj\b|\bBT\b|\/Font/.test(pdf));
+  assert.equal(shown.length, 45);
+  assert.equal((pdf.match(/\bTj\b/g) ?? []).length, 45, "nothing else is written");
+  assert.deepEqual(shown.slice(0, 3).map((m) => m[3]), ["0001", "0002", "0003"]);
+  // 8 pt, four Courier digits: 19.2 pt wide, centred on the first code at 25-45 mm.
+  assert.equal(shown[0][1], "8");
+  assert.ok(Math.abs(Number(shown[0][2]) + 9.6 - 35 * (72 / 25.4)) < 0.01);
   assert.match(pdf, /\/Count 2 /);
   assert.match(pdf, /\/MediaBox \[0 0 595.276 841.89\]/);
 });
 
-test("the PDF prints a header and references when asked", async () => {
+test("with serials turned off the PDF has no text at all", async () => {
+  const pdf = await text(await buildSheetPdf(entries(45), "BN-1", codesOnly, { compress: false }));
+  assert.ok(!/\bTj\b|\bBT\b|\/Font/.test(pdf));
+});
+
+test("the PDF prints a header when asked", async () => {
   const pdf = await text(await buildSheetPdf(entries(3), "BN-1", withText, { compress: false }));
 
   assert.ok(pdf.includes(`${pdfString("Batch BN-1 — 3 labels")} Tj`));
-  assert.ok(pdf.includes("(REF-00002) Tj"));
+  assert.ok(pdf.includes("(0003) Tj"));
 });
 
 test("the PDF's cross-reference table points at its objects", async () => {

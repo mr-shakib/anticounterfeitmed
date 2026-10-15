@@ -1,8 +1,9 @@
 """The label sheet layout: one per organization, set in the portal's settings.
 
-The layout decides what the printable sheet and PDF carry besides the codes.
-Its defaults carry nothing else, so a sheet nobody has configured goes to the
-printer as codes alone, 15 mm apart.
+The layout decides what the printable sheet, PDF and Excel file carry besides
+the codes. Its defaults carry each code's short serial and nothing else, so a
+sheet nobody has configured goes to the printer as codes 15 mm apart, each
+with its serial under it.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ DEFAULTS = {
     "footprint_mm": 20,
     "show_header": False,
     "header_text": "",
-    "show_reference": False,
+    "show_reference": True,
 }
 
 CUSTOM = {
@@ -35,7 +36,7 @@ CUSTOM = {
     "footprint_mm": 25,
     "show_header": True,
     "header_text": "Batch {batch} — {count} labels",
-    "show_reference": True,
+    "show_reference": False,
 }
 
 
@@ -52,7 +53,7 @@ def _settings(response) -> dict:
             for k, v in data.items()}
 
 
-def test_an_unconfigured_organization_prints_codes_alone(make_manufacturer):
+def test_an_unconfigured_organization_prints_codes_and_serials(make_manufacturer):
     client = _client(make_manufacturer("Alpha"))
 
     response = client.get(reverse("staff-label-layout"))

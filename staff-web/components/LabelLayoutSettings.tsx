@@ -101,9 +101,10 @@ export function LabelLayoutSettings({ organizationName }: { organizationName: st
   return (
     <div className="card">
       <p className="muted" style={{ marginTop: 0 }}>
-        Applies to every printable sheet and PDF generated for {organizationName}. By
-        default a sheet carries nothing but the codes. The codes themselves are the
-        same whatever is chosen here.
+        Applies to every printable sheet, PDF and Excel file generated for{" "}
+        {organizationName}. By default a sheet carries the codes and each one&rsquo;s
+        serial number, nothing else. The codes themselves are the same whatever is
+        chosen here.
       </p>
       <form onSubmit={save}>
         <div className="row" style={{ marginBottom: "0.9rem" }}>
@@ -189,7 +190,7 @@ export function LabelLayoutSettings({ organizationName }: { organizationName: st
             checked={draft.show_reference}
             onChange={(e) => set("show_reference", e.target.checked)}
           />
-          Print the unit reference under each code
+          Print the serial number under each code (0042, from reference …-000042)
         </label>
 
         <p className="muted" style={{ fontSize: "0.85rem" }}>

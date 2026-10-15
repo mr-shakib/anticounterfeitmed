@@ -190,8 +190,8 @@ class LabelLayout(models.Model):
 
     Presentation only. None of it reaches a symbol, and the sheet itself is
     drawn in the browser (staff-web/lib/labelPrint.ts). An organization without
-    a row prints with these defaults, which put nothing on the page but the
-    codes, 15 mm apart.
+    a row prints with these defaults: the codes 15 mm apart, each with its short
+    serial under it, and nothing else.
     """
 
     organization = models.OneToOneField(
@@ -209,8 +209,9 @@ class LabelLayout(models.Model):
     show_header = models.BooleanField(default=False)
     #: ``{batch}`` and ``{count}`` are filled in when a sheet is drawn.
     header_text = models.CharField(max_length=120, blank=True)
-    #: Print each unit's external reference under its code.
-    show_reference = models.BooleanField(default=False)
+    #: Print each unit's short serial under its code: its number within the
+    #: batch, at least four digits (``...-000042`` prints as ``0042``).
+    show_reference = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -6,7 +6,7 @@
  * printing -- date, address, page numbers -- can reach it. The codes are
  * vector rectangles, one path per symbol, so they stay sharp at any size.
  *
- * Text appears only when the layout asks for a header or references, in the
+ * Text appears only when the layout asks for a header or serials, in the
  * PDF standard fonts (nothing embedded), so it is limited to the Latin
  * characters those fonts carry; anything else prints as "?".
  *
@@ -16,18 +16,18 @@
 
 import { QUIET_ZONE, SYMBOL_MODULES, symbolModules } from "./labelSymbol.ts";
 import {
-  CAPTION_FONT_PT,
   CAPTION_OFFSET_MM,
   HEADER_FONT_PT,
+  MONO_ADVANCE,
+  captionFontPt,
   headerText,
   planSheet,
+  shortSerial,
   type LabelEntry,
   type LabelLayout,
 } from "./labelPrint.ts";
 
 const PT_PER_MM = 72 / 25.4;
-/** Courier advances every glyph by 0.6 em, so a reference's width is exact. */
-const COURIER_ADVANCE = 0.6;
 
 /** WinAnsi codes for the characters outside Latin-1 that a header is likely to use. */
 const WIN_ANSI: Record<string, number> = {
@@ -114,6 +114,7 @@ export async function buildSheetPdf(
   const widthPt = plan.width * PT_PER_MM;
   const heightPt = plan.height * PT_PER_MM;
   const size = layout.footprint_mm;
+  const captionPt = captionFontPt(size);
   const withText = layout.show_header || layout.show_reference;
   const header = headerText(layout, batchNumber, entries.length);
 
@@ -160,13 +161,14 @@ export async function buildSheetPdf(
     for (const { index, x, y } of plan.pages[i]) {
       ops.push(symbolOps(symbolModules(entries[index].qr), x, y, size, heightPt));
       if (layout.show_reference) {
-        const reference = entries[index].external_reference;
-        const textWidth = [...reference].length * COURIER_ADVANCE * CAPTION_FONT_PT;
+        // Courier advances every glyph equally, so the centring is exact.
+        const serial = shortSerial(entries[index].external_reference);
+        const textWidth = [...serial].length * MONO_ADVANCE * captionPt;
         ops.push(
           "0 g",
           textOps(
-            "F2", CAPTION_FONT_PT, (x + size / 2) * PT_PER_MM - textWidth / 2,
-            (y + size + CAPTION_OFFSET_MM) * PT_PER_MM + CAPTION_FONT_PT * 0.75, heightPt, reference,
+            "F2", captionPt, (x + size / 2) * PT_PER_MM - textWidth / 2,
+            (y + size + CAPTION_OFFSET_MM) * PT_PER_MM + captionPt * 0.75, heightPt, serial,
           ),
         );
       }
