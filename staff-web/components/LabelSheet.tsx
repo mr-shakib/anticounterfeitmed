@@ -1,8 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import JSZip from "jszip";
-import { SYMBOL_MODULES, symbolSvg, type LabelSymbol } from "@/lib/labelSymbol.ts";
+import { SYMBOL_MODULES, symbolSvg } from "@/lib/labelSymbol.ts";
+import { buildSheetPdf } from "@/lib/labelPdf.ts";
+import {
+  PAGE_SIZES,
+  buildSheetHtml,
+  headerText,
+  planSheet,
+  type LabelEntry,
+  type LabelLayout,
+} from "@/lib/labelPrint.ts";
 
 /**
  * Renders the generated labels as QR codes, and as a print-ready sheet.
@@ -19,7 +29,7 @@ import { SYMBOL_MODULES, symbolSvg, type LabelSymbol } from "@/lib/labelSymbol.t
  * callipers before committing to a run.
  */
 
-export type LabelEntry = { external_reference: string; qr: LabelSymbol };
+export type { LabelEntry };
 
 const EC_LEVEL = "Q" as const;
 
@@ -64,21 +74,37 @@ function renderSvg(entry: LabelEntry): string {
   return symbolSvg(entry.qr);
 }
 
+/**
+ * `layout` is the organization's sheet layout, with the footprint chosen for
+ * this run. The preview uses its spacing and shows references only when the
+ * sheet will, so what is on screen is what goes to the printer.
+ */
 export function LabelSheet({
   entries,
   batchNumber,
-  sizeMm,
+  layout,
 }: {
   entries: LabelEntry[];
   batchNumber: string;
-  sizeMm: number;
+  layout: LabelLayout;
 }) {
+  const sizeMm = layout.footprint_mm;
   const preview = useMemo(() => entries.slice(0, PREVIEW_LIMIT), [entries]);
   const svgs = useMemo(() => preview.map(renderSvg), [preview]);
+  const plan = useMemo(() => {
+    try {
+      return planSheet(entries.length, layout);
+    } catch {
+      return null;
+    }
+  }, [entries.length, layout]);
 
   return (
     <div>
-      <div className="label-grid">
+      <div
+        className="label-grid"
+        style={{ gap: `${layout.gap_mm}mm`, justifyContent: "center" }}
+      >
         {preview.map((entry, index) => (
           <figure className="label" key={entry.external_reference}>
             <div
@@ -86,7 +112,9 @@ export function LabelSheet({
               style={{ width: `${sizeMm}mm`, height: `${sizeMm}mm` }}
               dangerouslySetInnerHTML={{ __html: svgs[index] ?? "" }}
             />
-            <figcaption className="mono">{entry.external_reference}</figcaption>
+            {layout.show_reference && (
+              <figcaption className="mono">{entry.external_reference}</figcaption>
+            )}
           </figure>
         ))}
       </div>
@@ -114,16 +142,46 @@ export function LabelSheet({
           </div>
         );
       })()}
+      {plan ? (
+        <p className="muted" style={{ fontSize: "0.85rem" }}>
+          {PAGE_SIZES[layout.page_size].name}, {layout.page_margin_mm}&nbsp;mm margin,{" "}
+          {layout.gap_mm}&nbsp;mm between codes: {plan.perPage} per page ({plan.columns}
+          &nbsp;&times;&nbsp;{plan.rows}), {plan.pages.length} page(s).{" "}
+          {layout.show_header
+            ? `Header on each page: “${headerText(layout, batchNumber, entries.length)}”. `
+            : "No header. "}
+          {layout.show_reference ? "References under each code. " : "No references. "}
+          <Link href="/settings">Change the layout in Settings.</Link>
+        </p>
+      ) : (
+        <div className="alert error">
+          Not even one {sizeMm}&nbsp;mm label fits on the page with the current layout.{" "}
+          <Link href="/settings">Change it in Settings.</Link>
+        </div>
+      )}
       <div className="row" style={{ gap: "0.5rem" }}>
         <div className="shrink">
-          <button onClick={() => openPrintableSheet(entries, batchNumber, sizeMm)}>
+          <button
+            disabled={!plan}
+            onClick={() => openPrintableSheet(entries, batchNumber, layout)}
+          >
             Open printable sheet
           </button>
         </div>
         <div className="shrink">
           <button
             className="secondary"
-            onClick={() => downloadPrintableSheet(entries, batchNumber, sizeMm)}
+            disabled={!plan}
+            onClick={() => void downloadSheetPdf(entries, batchNumber, layout)}
+          >
+            Download sheet (PDF)
+          </button>
+        </div>
+        <div className="shrink">
+          <button
+            className="secondary"
+            disabled={!plan}
+            onClick={() => downloadPrintableSheet(entries, batchNumber, layout)}
           >
             Download sheet (HTML)
           </button>
@@ -150,70 +208,23 @@ function saveBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Builds the print-ready sheet as a standalone HTML document.
- *
- * Self-contained: the QR codes are inline SVG, so the file prints correctly
- * from any machine with no network and nothing else to copy alongside it.
- */
-async function buildSheetHtml(
+/** Downloads the printable sheet as a single self-contained HTML file. */
+export function downloadPrintableSheet(
   entries: LabelEntry[],
   batchNumber: string,
-  sizeMm: number,
-): Promise<string> {
-  const svgs = entries.map(renderSvg);
-  const labels = entries
-    .map(
-      (e, i) =>
-        `<figure class="label"><div class="qr">${svgs[i]}</div>` +
-        `<figcaption>${e.external_reference}</figcaption></figure>`,
-    )
-    .join("");
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Labels — ${batchNumber}</title>
-<style>
-  @page { size: A4; margin: 10mm; }
-  body { font-family: system-ui, sans-serif; margin: 0; color: #000; background: #fff; }
-  .head { padding: 0 0 6mm; }
-  h1 { font-size: 13pt; margin: 0 0 2mm; }
-  .warn { font-size: 9pt; border: 1px solid #000; padding: 2mm; }
-  .grid { display: flex; flex-wrap: wrap; gap: 4mm; }
-  .label { margin: 0; text-align: center; page-break-inside: avoid; }
-  .qr { width: ${sizeMm}mm; height: ${sizeMm}mm; }
-  .qr svg { width: 100%; height: 100%; display: block; }
-  figcaption { font-family: ui-monospace, monospace; font-size: 6pt; margin-top: 0.8mm; }
-</style>
-</head>
-<body>
-  <div class="head">
-    <h1>Labels — batch ${batchNumber} — ${entries.length} units</h1>
-    <div class="warn">
-      <strong>Print at 100% scale.</strong> Turn off &ldquo;fit to page&rdquo; and any
-      scaling, then measure one label with callipers before running the job.
-      Print on the actual packaging material. Do not add a logo inside a code.
-      <br><br>
-      These codes are shown once and cannot be regenerated. Keep this file under
-      the same controls as the printed labels, and destroy it once the job is
-      reconciled.
-    </div>
-  </div>
-  <div class="grid">${labels}</div>
-</body>
-</html>`;
+  layout: LabelLayout,
+) {
+  const html = buildSheetHtml(entries, batchNumber, layout);
+  saveBlob(new Blob([html], { type: "text/html" }), `labels-${batchNumber}.html`);
 }
 
-/** Downloads the printable sheet as a single self-contained HTML file. */
-export async function downloadPrintableSheet(
+/** Downloads the sheet as a PDF, with its page size and positions fixed. */
+export async function downloadSheetPdf(
   entries: LabelEntry[],
   batchNumber: string,
-  sizeMm: number,
+  layout: LabelLayout,
 ) {
-  const html = await buildSheetHtml(entries, batchNumber, sizeMm);
-  saveBlob(new Blob([html], { type: "text/html" }), `labels-${batchNumber}.html`);
+  saveBlob(await buildSheetPdf(entries, batchNumber, layout), `labels-${batchNumber}.pdf`);
 }
 
 /**
@@ -249,7 +260,7 @@ export async function downloadQrArchive(
       `Labels for batch ${batchNumber}`,
       `${entries.length} units, ${sizeMm}mm footprint, error correction ${EC_LEVEL}.`,
       "",
-      "One SVG per unit, named by the reference printed beside the code.",
+      "One SVG per unit, named by its unit reference. The codes carry no text.",
       "The footprint includes the quiet zone. Print at 100% scale, on the real",
       "packaging material, and measure one label before running the job.",
       "Do not place a logo inside a code.",
@@ -266,10 +277,10 @@ export async function downloadQrArchive(
 /**
  * Opens a print-ready sheet in a new window, for printing straight away.
  */
-export async function openPrintableSheet(
+export function openPrintableSheet(
   entries: LabelEntry[],
   batchNumber: string,
-  sizeMm: number,
+  layout: LabelLayout,
 ) {
   const win = window.open("", "_blank");
   if (!win) {
@@ -277,11 +288,11 @@ export async function openPrintableSheet(
     return;
   }
   win.document.write(
-    `<!doctype html><title>Labels — ${batchNumber}</title>` +
+    `<!doctype html><title>Labels</title>` +
       `<p style="font:14px system-ui;padding:16px">Rendering ${entries.length} labels…</p>`,
   );
 
-  const html = await buildSheetHtml(entries, batchNumber, sizeMm);
+  const html = buildSheetHtml(entries, batchNumber, layout);
   win.document.open();
   win.document.write(html);
   win.document.close();

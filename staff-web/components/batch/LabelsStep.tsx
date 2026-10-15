@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActionDialog } from "@/components/Dialog";
 import { Feedback, useAction } from "@/components/Feedback";
 import { LabelSheet, LABEL_SIZES_MM } from "@/components/LabelSheet";
-import { Batch, LabelExport, PrintJob, api } from "@/lib/api";
+import { ApiError, Batch, LabelExport, PrintJob, api } from "@/lib/api";
+import { DEFAULT_LABEL_LAYOUT, type LabelLayout } from "@/lib/labelPrint.ts";
 
 /**
  * Step 1: generate the codes and get them to the printer.
@@ -26,10 +27,30 @@ export function LabelsStep({
   const remaining = Math.max(batch.planned_unit_count - total, 0);
   const [count, setCount] = useState(String(remaining || batch.planned_unit_count));
   const [exported, setExported] = useState<LabelExport | null>(null);
-  const [labelSizeMm, setLabelSizeMm] = useState(20);
+  const [layout, setLayout] = useState<LabelLayout>(DEFAULT_LABEL_LAYOUT);
+  const [layoutError, setLayoutError] = useState("");
+  // Null until someone picks one for this run: the layout's default applies.
+  const [labelSizeMm, setLabelSizeMm] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   const generateAction = useAction();
   const runsAction = useAction();
+
+  useEffect(() => {
+    let live = true;
+    api
+      .get<LabelLayout>("/v1/staff/label-layout")
+      .then((saved) => live && setLayout(saved))
+      .catch((e) => {
+        if (live) {
+          setLayoutError(
+            e instanceof ApiError ? e.message : "Could not load the sheet layout.",
+          );
+        }
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const requested = Number(count);
   const overPlan = total + requested - batch.planned_unit_count;
@@ -122,7 +143,7 @@ export function LabelsStep({
             <label style={{ maxWidth: 200 }}>
               <span>Label footprint</span>
               <select
-                value={labelSizeMm}
+                value={labelSizeMm ?? layout.footprint_mm}
                 onChange={(e) => setLabelSizeMm(Number(e.target.value))}
               >
                 {LABEL_SIZES_MM.map((mm) => (
@@ -143,10 +164,15 @@ export function LabelsStep({
               </button>
             </div>
           </div>
+          {layoutError && (
+            <div className="alert error">
+              {layoutError} The sheet uses the default layout: codes only, 15&nbsp;mm apart.
+            </div>
+          )}
           <LabelSheet
             entries={exported.label_export}
             batchNumber={batch.batch_number}
-            sizeMm={labelSizeMm}
+            layout={{ ...layout, footprint_mm: labelSizeMm ?? layout.footprint_mm }}
           />
         </div>
       )}

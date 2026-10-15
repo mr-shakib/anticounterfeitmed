@@ -113,10 +113,37 @@ Once the export is deleted the codes are gone, and replacing lost labels means
 voiding those units and issuing new ones, which leaves a record. Deletion is
 recorded on the job, so disposal of an artifact holding raw tokens is visible.
 
-The codes are rendered in the browser and offered three ways: printed straight
-away, downloaded as a self-contained HTML sheet, or downloaded as a ZIP of one
-SVG per unit for label software. The CSV alongside them carries references and
-URLs for reconciliation; it cannot carry images.
+The codes are rendered in the browser and offered four ways: printed straight
+away, downloaded as a PDF, downloaded as a self-contained HTML sheet, or
+downloaded as a ZIP of one SVG per unit for label software. The CSV alongside
+them carries references for reconciliation; it cannot carry images.
+
+### Sheet layout
+
+The sheet and the PDF are laid out from one plan (`staff-web/lib/labelPrint.ts`),
+so they print the same codes in the same places. By default a sheet carries
+**nothing but the codes**: no title, no instructions, no reference under each
+code, and **15 mm of clear space** between neighbouring footprints, across and
+down. The grid is centred across the page; the margin is the least space at
+either side. The printing instructions live in the portal, beside the download buttons,
+not on the paper.
+
+Each manufacturer sets its own layout under Settings → Label sheet layout (any
+manufacturer staff; every change is audited): page size, page margin, spacing,
+the default footprint, an optional header line on each page (`{batch}` and
+`{count}` are filled in), and an optional reference under each code. The
+footprint can still be changed for a single run on the batch page.
+
+The HTML sheet's printed page has no margin of its own — the layout's margin is
+drawn inside it — so the browser has nowhere to put its date, address and page
+number. The PDF fixes the page size and positions in the file and asks viewers
+not to scale it. Either way, print at 100%.
+
+Excel is not offered. These symbols carry the token after the terminator
+(D21), so no spreadsheet function, QR font or add-in can produce them from
+text; a workbook could only hold images drawn here, and Excel positions images
+in pixels and row heights rather than millimetres, and scales to fit by default.
+The CSV opens in Excel for reconciliation.
 
 ### Footprint and whether a label can actually be read
 

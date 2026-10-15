@@ -37,6 +37,7 @@ class AuditAction(models.TextChoices):
         "PRODUCT_INFORMATION_UPDATED",
         "Product information updated",
     )
+    LABEL_LAYOUT_UPDATED = "LABEL_LAYOUT_UPDATED", "Label sheet layout updated"
 
 
 class AuditEvent(models.Model):

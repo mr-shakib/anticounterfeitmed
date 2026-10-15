@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { ApiError, Membership, api } from "@/lib/api";
 import { useSession } from "@/components/Session";
 import { Feedback, useAction } from "@/components/Feedback";
+import { LabelLayoutSettings } from "@/components/LabelLayoutSettings";
 
 export default function SettingsPage() {
   const { membership, refresh } = useSession();
@@ -191,6 +192,13 @@ export default function SettingsPage() {
 
       <h2>Password</h2>
       <PasswordCard />
+
+      {membership.organization.type === "MANUFACTURER" && (
+        <>
+          <h2>Label sheet layout</h2>
+          <LabelLayoutSettings organizationName={membership.organization.name} />
+        </>
+      )}
     </>
   );
 }

@@ -11,6 +11,7 @@ path and in transient request memory, and nowhere else.
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from django.db import models
 
@@ -173,3 +174,47 @@ class PackageUnit(models.Model):
 
     def can_transition_to(self, target: str) -> bool:
         return target in ALLOWED_TRANSITIONS[self.lifecycle]
+
+
+class PageSize(models.TextChoices):
+    A4 = "A4", "A4"
+    LETTER = "LETTER", "US Letter"
+
+
+#: Footprints the portal offers, in millimetres, quiet zone included.
+LABEL_FOOTPRINTS_MM: tuple[int, ...] = (5, 8, 10, 12, 15, 20, 25)
+
+
+class LabelLayout(models.Model):
+    """How an organization's label sheets are laid out on the page.
+
+    Presentation only. None of it reaches a symbol, and the sheet itself is
+    drawn in the browser (staff-web/lib/labelPrint.ts). An organization without
+    a row prints with these defaults, which put nothing on the page but the
+    codes, 15 mm apart.
+    """
+
+    organization = models.OneToOneField(
+        Organization,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name="label_layout",
+    )
+    page_size = models.CharField(max_length=10, choices=PageSize.choices, default=PageSize.A4)
+    page_margin_mm = models.DecimalField(max_digits=4, decimal_places=1, default=Decimal("10"))
+    #: Clear space between neighbouring footprints, across and down.
+    gap_mm = models.DecimalField(max_digits=4, decimal_places=1, default=Decimal("15"))
+    #: The footprint a new run starts with; it can still be changed per run.
+    footprint_mm = models.PositiveSmallIntegerField(default=20)
+    show_header = models.BooleanField(default=False)
+    #: ``{batch}`` and ``{count}`` are filled in when a sheet is drawn.
+    header_text = models.CharField(max_length=120, blank=True)
+    #: Print each unit's external reference under its code.
+    show_reference = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "label_layout"
+
+    def __str__(self) -> str:
+        return f"Label layout for {self.organization}"

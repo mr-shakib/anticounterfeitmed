@@ -30,8 +30,11 @@ const RECORD_VERSION = 2;
 const TOKEN_BYTES = 32;
 const BYTE_MODE = 0b0100;
 
+/** Light modules around the symbol, on every side. */
+export const QUIET_ZONE = 4;
+
 /** Modules per side of the printed footprint, quiet zone included. */
-export const SYMBOL_MODULES = 4 * SYMBOL_VERSION + 17 + 2 * 4;
+export const SYMBOL_MODULES = 4 * SYMBOL_VERSION + 17 + 2 * QUIET_ZONE;
 
 function hexToBytes(hex: string): Uint8Array {
   if (!/^(?:[0-9a-f]{2})*$/.test(hex)) throw new Error("malformed codewords");
@@ -41,12 +44,13 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 /**
- * Draws a label symbol as SVG, from the data codewords the backend issued.
+ * A label symbol's modules, from the data codewords the backend issued, as
+ * rows of dark (true) and light, without the quiet zone.
  *
  * Refuses anything but the one symbol shape the readers expect, so a format
  * change on the backend cannot silently print labels nobody can read.
  */
-export function symbolSvg(symbol: LabelSymbol, quietZone = 4): string {
+export function symbolModules(symbol: LabelSymbol): boolean[][] {
   if (symbol.version !== SYMBOL_VERSION || symbol.error_correction !== ERROR_CORRECTION) {
     throw new Error(
       `Unsupported label symbol ${symbol.version}-${symbol.error_correction}.`,
@@ -61,14 +65,21 @@ export function symbolSvg(symbol: LabelSymbol, quietZone = 4): string {
     Array.from(data),
     -1, // the mask with the lowest penalty, as any standard encoder picks
   );
+  return Array.from({ length: qr.size }, (_, y) =>
+    Array.from({ length: qr.size }, (_, x) => qr.getModule(x, y)),
+  );
+}
 
-  const side = qr.size + 2 * quietZone;
+/** Draws a label symbol as SVG. */
+export function symbolSvg(symbol: LabelSymbol, quietZone = QUIET_ZONE): string {
+  const modules = symbolModules(symbol);
+  const side = modules.length + 2 * quietZone;
   const path: string[] = [];
-  for (let y = 0; y < qr.size; y++) {
-    for (let x = 0; x < qr.size; x++) {
-      if (qr.getModule(x, y)) path.push(`M${x + quietZone},${y + quietZone}h1v1h-1z`);
-    }
-  }
+  modules.forEach((row, y) =>
+    row.forEach((dark, x) => {
+      if (dark) path.push(`M${x + quietZone},${y + quietZone}h1v1h-1z`);
+    }),
+  );
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${side} ${side}" ` +
     `shape-rendering="crispEdges">` +

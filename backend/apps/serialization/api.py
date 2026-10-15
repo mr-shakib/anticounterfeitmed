@@ -8,6 +8,10 @@ must never be logged with its body.
 
 from __future__ import annotations
 
+import re
+from decimal import Decimal
+
+from django.db import transaction
 from rest_framework import serializers, status
 from rest_framework.decorators import (
     api_view,
@@ -18,10 +22,16 @@ from rest_framework.response import Response
 
 from medcrypto import labels
 
+from apps.audit.models import AuditAction, AuditEvent
 from apps.catalog.models import Batch
 from apps.organizations.permissions import STAFF_AUTH, IsManufacturerStaff, owns
 from apps.qc.services import batch_manufacturing_progress
-from apps.serialization.models import PackageUnit, PrintJob
+from apps.serialization.models import (
+    LABEL_FOOTPRINTS_MM,
+    LabelLayout,
+    PackageUnit,
+    PrintJob,
+)
 from apps.serialization.export_store import ExportUnavailable, decrypt_export
 from apps.serialization.services import (
     IssuanceNotPermitted,
@@ -303,3 +313,77 @@ def reconcile_job(request, job_id):
     )
     return Response(PrintJobSerializer(job).data)
 
+
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+class LabelLayoutSerializer(serializers.ModelSerializer):
+    page_margin_mm = serializers.DecimalField(
+        max_digits=4, decimal_places=1, min_value=Decimal("0"), max_value=Decimal("50"),
+        coerce_to_string=False, required=False,
+    )
+    gap_mm = serializers.DecimalField(
+        max_digits=4, decimal_places=1, min_value=Decimal("0"), max_value=Decimal("100"),
+        coerce_to_string=False, required=False,
+    )
+    footprint_mm = serializers.ChoiceField(choices=LABEL_FOOTPRINTS_MM, required=False)
+
+    class Meta:
+        model = LabelLayout
+        fields = [
+            "page_size", "page_margin_mm", "gap_mm", "footprint_mm",
+            "show_header", "header_text", "show_reference", "updated_at",
+        ]
+        read_only_fields = ["updated_at"]
+
+    def validate_header_text(self, value: str) -> str:
+        # One line on the page. A line break or a control character would
+        # print differently in the HTML sheet and the PDF.
+        if _CONTROL_CHARACTERS.search(value):
+            raise serializers.ValidationError("The header must be a single line of text.")
+        return value
+
+
+def _layout_detail(layout: LabelLayout) -> dict:
+    """The layout as plain JSON, for the audit record."""
+    data = LabelLayoutSerializer(layout).data
+    data.pop("updated_at")
+    return {
+        key: float(value) if isinstance(value, Decimal) else value
+        for key, value in data.items()
+    }
+
+
+@api_view(["GET", "PATCH"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsManufacturerStaff])
+def label_layout(request):
+    """The caller's organization's label sheet layout.
+
+    Applies to every printable sheet and PDF the portal draws for that
+    organization. Until someone saves one, the defaults put nothing on the page
+    but the codes. A field left out of a change keeps its current value.
+    """
+    org = request.membership.organization
+    if request.method == "GET":
+        layout = LabelLayout.objects.filter(organization=org).first()
+        return Response(LabelLayoutSerializer(layout or LabelLayout(organization=org)).data)
+
+    serializer = LabelLayoutSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    with transaction.atomic():
+        LabelLayout.objects.get_or_create(organization=org)
+        layout = LabelLayout.objects.select_for_update().get(organization=org)
+        before = _layout_detail(layout)
+        for field, value in serializer.validated_data.items():
+            setattr(layout, field, value)
+        layout.save()
+        AuditEvent.objects.create(
+            action=AuditAction.LABEL_LAYOUT_UPDATED,
+            organization=org,
+            actor_user=request.user,
+            reason="Label sheet layout updated",
+            detail={"before": before, "after": _layout_detail(layout)},
+        )
+    return Response(LabelLayoutSerializer(layout).data)
