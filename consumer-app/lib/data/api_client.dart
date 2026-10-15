@@ -61,6 +61,47 @@ class PackageDetails {
   });
 }
 
+/// One section of the manufacturer's prescribing information.
+class InformationSection {
+  final String field;
+  final String text;
+  const InformationSection(this.field, this.text);
+}
+
+/// The sections the app knows how to title, in the order it shows them. A
+/// section it does not know is left out rather than shown untitled.
+const informationFields = [
+  'indications',
+  'therapeutic_class',
+  'pharmacology',
+  'dosage_administration',
+  'interaction',
+  'contraindications',
+  'side_effects',
+  'pregnancy_lactation',
+  'precautions_warnings',
+  'overdose_effects',
+  'reconstitution',
+  'storage_conditions',
+];
+
+/// Reads `product_information` out of a status record whose signature has
+/// already been checked. Malformed or unknown entries are dropped.
+List<InformationSection> informationFrom(Map<String, dynamic> status) {
+  final entries = status['product_information'];
+  if (entries is! List) return const [];
+  final sections = <InformationSection>[];
+  for (final entry in entries) {
+    if (entry is! Map) continue;
+    final field = entry['field'], text = entry['text'];
+    if (field is String && text is String && text.trim().isNotEmpty &&
+        informationFields.contains(field)) {
+      sections.add(InformationSection(field, text.trim()));
+    }
+  }
+  return sections;
+}
+
 class PrepareResult {
   final Outcome outcome;
   final String? unitId;
@@ -68,12 +109,17 @@ class PrepareResult {
   final PackageDetails? package;
   final List<String> restrictions;
 
+  /// The manufacturer's prescribing information, from the signed status
+  /// statement. Empty when there is none, or no package to go with it.
+  final List<InformationSection> information;
+
   const PrepareResult({
     required this.outcome,
     this.unitId,
     this.challengeId,
     this.package,
     this.restrictions = const [],
+    this.information = const [],
   });
 }
 
@@ -324,6 +370,9 @@ class ApiClient {
       challengeId: body['challenge_id'] as String?,
       package: package,
       restrictions: restrictions,
+      // Only with a verified, bound credential: never beside an unknown,
+      // inactive or restricted code.
+      information: package == null ? const [] : informationFrom(status),
     );
   }
 

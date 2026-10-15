@@ -85,6 +85,9 @@ class StaffMembership(models.Model):
     )
     role = models.CharField(max_length=32, choices=StaffRole.choices)
     is_enabled = models.BooleanField(default=True)
+    #: Set when an administrator created the account with a temporary password.
+    #: Nothing else is reachable until the owner has chosen their own.
+    password_change_required = models.BooleanField(default=False)
     mfa_enabled = models.BooleanField(default=False)
 
     #: Shared TOTP secret. Credential material: never returned by an API once

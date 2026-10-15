@@ -3,14 +3,35 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, type ComponentType, type SVGProps } from "react";
+import { Footer } from "@/components/Footer";
+import {
+  BuildingIcon,
+  HistoryIcon,
+  LayersIcon,
+  LogOutIcon,
+  OverviewIcon,
+  PackageIcon,
+  SearchAlertIcon,
+  SettingsIcon,
+  UsersIcon,
+} from "@/components/Icons";
 import { SessionProvider, useSession } from "@/components/Session";
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({
+  href,
+  label,
+  icon: IconComponent,
+}: {
+  href: string;
+  label: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+}) {
   const pathname = usePathname();
   const active = pathname === href || (href !== "/" && pathname.startsWith(href));
   return (
     <Link href={href} className={active ? "active" : ""}>
+      <IconComponent />
       {label}
     </Link>
   );
@@ -34,56 +55,62 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <Image src="/mark.png" alt="" width={52} height={52} priority />
-          <strong>Anticounterfeit Med</strong>
-          <span className="muted">{membership.organization.name}</span>
+          <Image src="/mark.png" alt="" width={40} height={40} priority />
+          <div className="brand-text">
+            <strong>Anticounterfeit Med</strong>
+            <span className="muted">{membership.organization.name}</span>
+          </div>
         </div>
         <nav className="nav">
-          <NavLink href="/" label="Overview" />
-          <NavLink href="/settings" label="Settings" />
+          <NavLink href="/" label="Overview" icon={OverviewIcon} />
 
           {!isAdmin && (
             <>
               <div className="nav-heading">Manufacturer</div>
-              <NavLink href="/products" label="Products" />
-              <NavLink href="/batches" label="Batches" />
+              <NavLink href="/products" label="Products" icon={PackageIcon} />
+              <NavLink href="/batches" label="Batches" icon={LayersIcon} />
             </>
           )}
 
           {isAdmin && (
             <>
               <div className="nav-heading">Platform</div>
-              <NavLink href="/organizations" label="Organizations" />
-              <NavLink href="/staff" label="Staff access" />
-              <NavLink href="/reports" label="Investigations" />
-              <NavLink href="/audit" label="Audit trail" />
+              <NavLink href="/organizations" label="Organizations" icon={BuildingIcon} />
+              <NavLink href="/staff" label="Staff access" icon={UsersIcon} />
+              <NavLink href="/reports" label="Investigations" icon={SearchAlertIcon} />
+              <NavLink href="/audit" label="Audit trail" icon={HistoryIcon} />
             </>
           )}
+
+          <div className="nav-heading">Account</div>
+          <NavLink href="/settings" label="Settings" icon={SettingsIcon} />
         </nav>
-        <div style={{ padding: "1rem 1.25rem" }}>
-          <p className="muted" style={{ marginTop: 0 }}>
-            {membership.username}
-            <br />
-            <span className="badge">{membership.role.replace(/_/g, " ").toLowerCase()}</span>
-          </p>
-          {canRelease && (
-            <p className="muted">
-              You can release units into circulation.
-            </p>
-          )}
+        <div className="account">
+          <div className="account-row">
+            <span className="avatar">{membership.username.slice(0, 2)}</span>
+            <div className="account-who">
+              <strong>{membership.username}</strong>
+              <span>{membership.role.replace(/_/g, " ").toLowerCase()}</span>
+            </div>
+          </div>
+          {canRelease && <p className="account-note">You can release units into circulation.</p>}
           <button className="secondary" onClick={() => void signOut()}>
+            <LogOutIcon />
             Sign out
           </button>
         </div>
       </aside>
-      <main className="content">
-        {membership.organization.is_suspended && (
-          <div className="alert error">
-            This organization is suspended. Issuance and activation are blocked.
-          </div>
-        )}
-        {children}
-      </main>
+      <div className="main">
+        <main className="content">
+          {membership.organization.is_suspended && (
+            <div className="alert error">
+              This organization is suspended. Issuance and activation are blocked.
+            </div>
+          )}
+          {children}
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 }

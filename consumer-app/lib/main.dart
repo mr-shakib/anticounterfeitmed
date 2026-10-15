@@ -7,11 +7,19 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app_state.dart';
 import 'screens/scan_screen.dart';
+import 'ui/theme.dart';
 
-void main() => runApp(const AnticounterfeitMedApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Bundled locale data for dates in Bangla; nothing is fetched.
+  await initializeDateFormatting('bn');
+  await initializeDateFormatting('en');
+  runApp(const AnticounterfeitMedApp());
+}
 
 class AnticounterfeitMedApp extends StatefulWidget {
   const AnticounterfeitMedApp({super.key});
@@ -24,6 +32,12 @@ class _AnticounterfeitMedAppState extends State<AnticounterfeitMedApp> {
   final AppState _state = AppState();
 
   @override
+  void initState() {
+    super.initState();
+    _state.restorePreferences();
+  }
+
+  @override
   void dispose() {
     _state.dispose();
     super.dispose();
@@ -33,19 +47,18 @@ class _AnticounterfeitMedAppState extends State<AnticounterfeitMedApp> {
   Widget build(BuildContext context) {
     return AppScope(
       state: _state,
-      child: MaterialApp(
-        title: 'Anticounterfeit Med',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorSchemeSeed: const Color(0xFF0B6B5E),
-          useMaterial3: true,
+      child: ListenableBuilder(
+        listenable: _state,
+        builder: (context, _) => MaterialApp(
+          title: 'Anticounterfeit Med',
+          debugShowCheckedModeBanner: false,
+          theme: lightTheme(),
+          darkTheme: darkTheme(),
+          // Light by default. Dark, or following the phone, is a choice made
+          // in Settings.
+          themeMode: _state.themeMode,
+          home: const ScanScreen(),
         ),
-        darkTheme: ThemeData(
-          colorSchemeSeed: const Color(0xFF0B6B5E),
-          brightness: Brightness.dark,
-          useMaterial3: true,
-        ),
-        home: const ScanScreen(),
       ),
     );
   }

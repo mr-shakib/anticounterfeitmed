@@ -60,6 +60,40 @@ def provision_signing_key(
     return key
 
 
+def organizations_with_activation_key(organization_ids) -> set:
+    """Which of these organizations hold an active key to sign credentials with."""
+    return set(
+        SigningKey.objects.filter(
+            purpose=KeyPurpose.ACTIVATION,
+            state=KeyState.ACTIVE,
+            organization_id__in=organization_ids,
+        ).values_list("organization_id", flat=True)
+    )
+
+
+@transaction.atomic
+def ensure_activation_key(organization: Organization) -> SigningKey | None:
+    """Associate an approved manufacturer with the key its credentials are signed by.
+
+    Returns the newly provisioned key, or None when the organization already has
+    an active one. A new key is only usable by the app once a manifest lists it,
+    so the manifest is republished in the same transaction.
+
+    Refuses on an instance that has no root key yet. ``infra/provision-keys.sh``
+    creates the root and status keys and declines to run once any key exists,
+    so provisioning a manufacturer key first would leave the instance unable to
+    publish a manifest at all.
+    """
+    if organization.signing_keys.filter(
+        purpose=KeyPurpose.ACTIVATION, state=KeyState.ACTIVE
+    ).exists():
+        return None
+    active_key_for(purpose=KeyPurpose.ROOT)  # raises NoUsableKey when absent
+    key = provision_signing_key(purpose=KeyPurpose.ACTIVATION, organization=organization)
+    publish_trust_manifest()
+    return key
+
+
 def active_key_for(*, purpose: str, organization: Organization | None = None) -> SigningKey:
     now = timezone.now()
     query = SigningKey.objects.filter(purpose=purpose, state=KeyState.ACTIVE)

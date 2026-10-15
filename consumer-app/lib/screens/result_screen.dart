@@ -11,7 +11,11 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../core/outcomes.dart';
+import '../data/api_client.dart';
 import '../screens/report_screen.dart';
+import '../ui/components.dart';
+import '../ui/medicine_information.dart';
+import '../ui/theme.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({
@@ -22,6 +26,7 @@ class ResultScreen extends StatefulWidget {
     this.pendingReceipt = false,
     this.operationId,
     this.externalReference = '',
+    this.information = const [],
   });
 
   final Outcome outcome;
@@ -32,6 +37,10 @@ class ResultScreen extends StatefulWidget {
   /// Set when a receipt is still being signed, so the screen can poll for it.
   final String? operationId;
   final String externalReference;
+
+  /// The prescribing information from the preview, shown again here so it is
+  /// not lost the moment the check is recorded.
+  final List<InformationSection> information;
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
@@ -81,74 +90,132 @@ class _ResultScreenState extends State<ResultScreen> {
     });
   }
 
-  Color _tone(BuildContext context) {
-    if (outcome.isRestriction) return Theme.of(context).colorScheme.errorContainer;
-    if (outcome.isPositive) return const Color(0xFFE9F7EF);
-    return Theme.of(context).colorScheme.surfaceContainerHighest;
-  }
-
-  IconData get _icon {
-    if (outcome.isRestriction) return Icons.warning_amber_rounded;
-    if (outcome.isPositive) return Icons.verified_outlined;
-    if (outcome == Outcome.previouslyVerified) return Icons.history;
-    return Icons.info_outline;
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final s = state.strings;
+    final tones = AppTones.of(context);
+    final theme = Theme.of(context);
+    final tone = outcome.tone(tones);
 
     return Scaffold(
-      appBar: AppBar(title: Text(s.appName)),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text(s.appName),
+        actions: [
+          IconButton(
+            tooltip: s.close,
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+          ),
+        ],
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Card(
-            color: _tone(context),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(_icon, size: 36),
-                  const SizedBox(height: 12),
-                  Text(
-                    s.resultText(outcome),
-                    style: Theme.of(context).textTheme.titleMedium,
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+            decoration: BoxDecoration(
+              color: tone.background,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: tone.border),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: tone.border, width: 2),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${s.checkedAt}: ${checkedAt.toLocal()}',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  child: Icon(outcome.icon, color: tone.foreground, size: 38),
+                ),
+                const SizedBox(height: 18),
+                // The fixed wording from docs/09, word for word.
+                Text(
+                  s.resultText(outcome),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: tone.foreground,
+                    height: 1.3,
                   ),
-                  if (firstVerification) ...[
-                    const SizedBox(height: 4),
-                    Text(s.firstVerificationRecorded,
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                  if (_pending) ...[
-                    const SizedBox(height: 8),
-                    Text(s.pendingReceipt,
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ],
-              ),
+                ),
+              ],
             ),
           ),
 
-          // Mandatory on any successful result. Never let a positive outcome
-          // read as a statement about the medicine itself.
-          if (outcome.showsPackage)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(
-                s.contentsClarification,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+          // Mandatory on any successful result, and given the same weight as
+          // the result itself: a positive outcome must never read as a
+          // statement about the medicine.
+          if (outcome.showsPackage) ...[
+            const SizedBox(height: 12),
+            ToneBanner(
+              tone: tones.neutral,
+              icon: Icons.science_outlined,
+              message: s.contentsClarification,
+              emphasis: true,
             ),
+          ],
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: Column(
+              children: [
+                InfoRow(
+                  icon: Icons.schedule_rounded,
+                  label: s.checkedAt,
+                  value: formatCheckedAt(checkedAt, state.language),
+                ),
+                if (firstVerification) ...[
+                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.task_alt_rounded, size: 20, color: tones.match.foreground),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            s.firstVerificationRecorded,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (_pending) ...[
+                  const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(child: Text(s.pendingReceipt, style: theme.textTheme.bodyMedium)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          if (outcome.showsPackage && widget.information.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            MedicineInformation(sections: widget.information, strings: s),
+          ],
+        ],
+      ),
+      bottomNavigationBar: BottomActionBar(
+        children: [
           OutlinedButton.icon(
             icon: const Icon(Icons.flag_outlined),
             label: Text(s.reportTitle),
@@ -158,10 +225,9 @@ class _ResultScreenState extends State<ResultScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           FilledButton(
-            onPressed: () => Navigator.of(context)
-                .popUntil((route) => route.isFirst),
+            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
             child: Text(s.close),
           ),
         ],

@@ -119,11 +119,18 @@ def build_status_record(
     expires_at: datetime,
     operation_id: str | None = None,
     event_id: str | None = None,
+    product_information: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Build a short-lived signed statement of current status.
 
     Status lives outside the activation credential because a static signature
     cannot know that a later scan, block or recall happened.
+
+    ``product_information`` is the manufacturer's optional prescribing text, as
+    an ordered list of ``{"field", "text"}`` (a list, because canonical JSON
+    sorts object keys). It is signed here so the app can show it under the
+    same verification as everything else, and it is left out entirely when
+    there is none, so a statement without it is byte-for-byte unchanged.
     """
     if expires_at <= issued_at:
         raise ValueError("expires_at must be after issued_at")
@@ -131,7 +138,12 @@ def build_status_record(
         raise ValueError("token_sha256 must be a 32-byte digest")
     if not request_nonce:
         raise ValueError("request_nonce is required for replay binding")
-    return {
+    for entry in product_information or []:
+        if set(entry) != {"field", "text"} or not all(
+            isinstance(entry[k], str) for k in ("field", "text")
+        ):
+            raise ValueError("product_information entries are {field, text} strings")
+    record = {
         "schema": STATUS_SCHEMA,
         "algorithm": ALGORITHM,
         "key_id": key_id,
@@ -147,6 +159,9 @@ def build_status_record(
         "issued_at": _utc_iso(issued_at),
         "expires_at": _utc_iso(expires_at),
     }
+    if product_information:
+        record["product_information"] = [dict(e) for e in product_information]
+    return record
 
 
 class BindingError(Exception):

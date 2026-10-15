@@ -24,89 +24,88 @@
 })();
 </script>
 <style>
+  /* Light theme only, for now: color-scheme keeps form controls light too. */
   :root {
-    --bg: #ffffff;
-    --surface: #f5f7fa;
-    --border: #d8dee7;
-    --text: #12181f;
-    --muted: #5a6572;
-    --accent: #0b6b5e;
+    color-scheme: light;
+    --bg: #f4f6f8;
+    --surface: #ffffff;
+    --surface-2: #f8fafb;
+    --border: #e3e8ee;
+    --text: #0f1b2a;
+    --text-2: #334155;
+    --muted: #64748b;
+    --accent: #0b7a6b;
+    --accent-soft: #e7f5f2;
     --accent-text: #ffffff;
-    --warn-bg: #fff8e6;
-    --warn-border: #e8cf8a;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #10141a;
-      --surface: #1a212a;
-      --border: #2c3643;
-      --text: #eef2f7;
-      --muted: #9aa6b4;
-      --accent: #3fbfa8;
-      --accent-text: #0a1a17;
-      --warn-bg: #2a2416;
-      --warn-border: #5c4f2a;
-    }
+    --warn: #7a4a06;
+    --warn-bg: #fffaeb;
+    --warn-border: #fedf89;
+    --radius: 14px;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
-    background: var(--bg);
+    background: radial-gradient(760px 360px at 50% -6%, #dff1ed 0%, transparent 70%), var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
-    line-height: 1.55;
-    font-size: 17px;
+    line-height: 1.6;
+    font-size: 16.5px;
+    -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 34rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
-  header { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 1.5rem; }
-  .brand { margin-bottom: .9rem; }
-  .brand img { width: 56px; height: 56px; display: block; margin-bottom: .45rem; }
-  .mark { font-size: .78rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin: 0; }
-  h1 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 .35rem; }
-  .bn { font-size: 1.15rem; color: var(--muted); margin: 0; }
-  h2 { font-size: 1.1rem; margin: 2rem 0 .75rem; }
-  ol { padding-left: 1.25rem; margin: 0; }
-  li { margin-bottom: 1rem; }
-  li .en { display: block; }
-  li .bn { display: block; font-size: .97rem; margin-top: .15rem; }
+  .wrap { max-width: 36rem; margin: 0 auto; padding: 2.25rem 1rem 2.5rem; }
+  header { text-align: center; margin-bottom: 1.75rem; }
+  .brand img { width: 64px; height: 64px; display: block; margin: 0 auto .6rem; border-radius: 50%; }
+  .mark { font-size: .76rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0 0 .9rem; }
+  h1 { font-size: 1.55rem; line-height: 1.25; letter-spacing: -.015em; margin: 0 0 .45rem; }
+  .bn { color: var(--muted); margin: 0; }
+  header .bn { font-size: 1.08rem; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.35rem 1.4rem; box-shadow: 0 1px 3px rgba(15, 27, 42, .06);
+  }
+  .panel > p { margin: 0 0 .5rem; }
+  .panel > p.bn { margin-bottom: 0; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .8rem; letter-spacing: -.005em; }
+  ol { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+  li {
+    counter-increment: step; position: relative;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: .85rem 1rem .85rem 3.4rem; margin-bottom: .6rem;
+  }
+  li::before {
+    content: counter(step); position: absolute; left: 1rem; top: .85rem;
+    width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 700; font-size: .9rem;
+  }
+  li .en { display: block; font-weight: 500; }
+  li .bn { display: block; font-size: .95rem; margin-top: .1rem; }
   .note {
-    background: var(--warn-bg);
-    border: 1px solid var(--warn-border);
-    border-radius: 10px;
-    padding: .9rem 1rem;
-    margin: 1.75rem 0;
-    font-size: .95rem;
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn);
+    border-radius: 12px; padding: .95rem 1.1rem; margin: 1.5rem 0; font-size: .95rem;
   }
-  .note p { margin: 0 0 .4rem; }
+  .note p { margin: 0 0 .35rem; }
   .note p:last-child { margin-bottom: 0; }
-  .stores { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0 0; }
+  .note .bn { color: var(--warn); opacity: .9; }
+  .stores { display: flex; flex-wrap: wrap; gap: .6rem; }
   .store {
-    display: inline-block;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--muted);
-    border-radius: 8px;
-    padding: .7rem 1rem;
-    font-size: .93rem;
+    display: inline-block; border: 1px dashed #cfd7df; background: var(--surface-2);
+    color: var(--muted); border-radius: 10px; padding: .7rem 1rem; font-size: .92rem;
   }
   .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem;
-    margin-top: 1rem;
-    font-size: .95rem;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1rem 1.1rem; font-size: .95rem;
   }
   .card p { margin: 0 0 .4rem; }
   .card p:last-child { margin-bottom: 0; }
   a { color: var(--accent); }
   footer {
-    margin-top: 2.5rem; padding-top: 1.25rem;
-    border-top: 1px solid var(--border);
-    font-size: .86rem; color: var(--muted);
+    margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+    font-size: .85rem; color: var(--muted);
   }
   footer p { margin: 0 0 .5rem; }
+  .credit { margin-top: 1rem; font-size: .8rem; text-align: center; }
 </style>
 </head>
 <body>
@@ -122,6 +121,7 @@
     <p class="bn">এই প্যাকেটটি যাচাই করতে অফিশিয়াল অ্যাপটি খুলুন</p>
   </header>
 
+  <div class="panel">
   <p>
     You reached this page by scanning with an ordinary camera or QR app.
     <strong>Checking a package is only possible in the official app.</strong>
@@ -130,6 +130,7 @@
     আপনি সাধারণ ক্যামেরা বা কিউআর অ্যাপ দিয়ে স্ক্যান করে এই পাতায় এসেছেন।
     <strong>প্যাকেট যাচাই কেবল অফিশিয়াল অ্যাপেই করা যায়।</strong>
   </p>
+  </div>
 
   <h2>What to do / যা করবেন</h2>
   <ol>
@@ -178,6 +179,7 @@
     <p class="bn">
       এই সেবা প্যাকেটের ডিজিটাল রেকর্ড যাচাই করে। এটি ওষুধের উপাদান পরীক্ষা করে না।
     </p>
+    <p class="credit">Developed by Shakib Howlader · shakibhowlader.online</p>
   </footer>
 
 </div>

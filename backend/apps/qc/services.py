@@ -266,3 +266,54 @@ def batch_manufacturing_progress(batch_id) -> dict:
         "units_ready": units_ready,
         "units_scan_verified": scan_verified,
     }
+
+
+def batches_progress(batch_ids) -> dict:
+    """Where each of several batches stands, for a list of them.
+
+    The batch list used to say only "active" or "recalled", so nobody could see
+    which batch was waiting on them. This is the per-lifecycle count and the
+    activation-ready quantity for every batch at once, in two queries rather
+    than two per batch. ``units_ready`` follows the same rule as
+    :func:`batch_manufacturing_progress`.
+    """
+    from django.db.models import Exists, OuterRef
+
+    progress = {
+        batch_id: {"units_total": 0, "counts_by_lifecycle": {}, "units_ready": 0}
+        for batch_id in batch_ids
+    }
+
+    tallied = (
+        PackageUnit.objects.filter(batch_id__in=batch_ids)
+        .values("batch_id", "lifecycle")
+        .annotate(units=Count("id"))
+    )
+    for row in tallied:
+        entry = progress[row["batch_id"]]
+        entry["counts_by_lifecycle"][row["lifecycle"]] = row["units"]
+        entry["units_total"] += row["units"]
+
+    def has(step):
+        return Exists(
+            ManufacturingCompletionEvent.objects.filter(unit=OuterRef("pk"), step=step)
+        )
+
+    ready = (
+        PackageUnit.objects.filter(
+            batch_id__in=batch_ids,
+            lifecycle=UnitLifecycle.COVERED,
+            is_blocked=False,
+        )
+        .filter(
+            has(ManufacturingStep.PRINTED),
+            has(ManufacturingStep.QC_PASSED),
+            has(ManufacturingStep.COATED),
+        )
+        .values("batch_id")
+        .annotate(units=Count("id"))
+    )
+    for row in ready:
+        progress[row["batch_id"]]["units_ready"] = row["units"]
+
+    return progress

@@ -51,16 +51,32 @@ staff_auth_patterns = [
     path("v1/staff/mfa/confirm", staff_api.mfa_confirm, name="staff-mfa-confirm"),
     path("v1/staff/mfa/verify", staff_api.mfa_verify, name="staff-mfa-verify"),
     path("v1/staff/mfa/disable", staff_api.mfa_disable, name="staff-mfa-disable"),
-    path("v1/admin/memberships", staff_api.list_memberships, name="admin-memberships"),
+    path("v1/staff/password", staff_api.change_password, name="staff-password"),
+    path("v1/admin/memberships", staff_api.memberships, name="admin-memberships"),
     path(
         "v1/admin/memberships/<uuid:membership_id>/reset-mfa",
         staff_api.reset_membership_mfa,
         name="admin-membership-reset-mfa",
     ),
+    path(
+        "v1/admin/memberships/<uuid:membership_id>/disable",
+        staff_api.disable_membership,
+        name="admin-membership-disable",
+    ),
+    path(
+        "v1/admin/memberships/<uuid:membership_id>/enable",
+        staff_api.enable_membership,
+        name="admin-membership-enable",
+    ),
 ]
 
 manufacturer_patterns = [
     path("v1/staff/products", catalog_api.products, name="staff-products"),
+    path(
+        "v1/staff/products/<uuid:product_id>/information",
+        catalog_api.product_information,
+        name="staff-product-information",
+    ),
     path("v1/staff/batches", catalog_api.batches, name="staff-batches"),
     path("v1/staff/batches/<uuid:batch_id>", catalog_api.batch_detail, name="staff-batch"),
     path(
@@ -114,6 +130,11 @@ manufacturer_patterns = [
         "v1/staff/batches/<uuid:batch_id>/recall",
         activation_api.recall_batch,
         name="staff-batch-recall",
+    ),
+    path(
+        "v1/staff/batches/<uuid:batch_id>/activation-jobs",
+        activation_api.batch_activation_jobs,
+        name="staff-batch-activation-jobs",
     ),
     path(
         "v1/staff/units/<uuid:unit_id>/block",

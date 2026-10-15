@@ -151,6 +151,22 @@ def batch_units(request, batch_id):
     lifecycle = request.query_params.get("lifecycle")
     if lifecycle:
         queryset = queryset.filter(lifecycle=lifecycle)
+    if request.query_params.get("blocked") == "true":
+        queryset = queryset.filter(is_blocked=True)
+    # Search by the reference printed beside the code -- what someone holding a
+    # strip can read off it.
+    search = request.query_params.get("q", "").strip()
+    if search:
+        queryset = queryset.filter(external_reference__icontains=search)
+
+    try:
+        offset = max(int(request.query_params.get("offset", 0)), 0)
+        limit = min(max(int(request.query_params.get("limit", 500)), 1), 500)
+    except ValueError:
+        return Response(
+            {"code": "BAD_PAGE", "detail": "offset and limit must be whole numbers."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     counts: dict[str, int] = {}
     for unit in PackageUnit.objects.filter(batch=batch).values_list("lifecycle", flat=True):
@@ -159,10 +175,13 @@ def batch_units(request, batch_id):
     return Response(
         {
             "counts_by_lifecycle": counts,
+            "units_blocked": PackageUnit.objects.filter(batch=batch, is_blocked=True).count(),
             # Manufacturer-asserted records, not captured scan evidence. The
             # portal labels them as such.
             **batch_manufacturing_progress(batch.id),
-            "units": UnitSerializer(queryset[:500], many=True).data,
+            "units_matching": queryset.count(),
+            "offset": offset,
+            "units": UnitSerializer(queryset[offset : offset + limit], many=True).data,
         }
     )
 
@@ -266,6 +285,15 @@ def reconcile_job(request, job_id):
             {"code": "NOT_FOUND", "detail": "No such print job."},
             status=status.HTTP_404_NOT_FOUND,
         )
+    for field in ("printed", "rejected"):
+        if serializer.validated_data[field] > job.issued_count:
+            return Response(
+                {
+                    "code": "COUNT_EXCEEDS_ISSUED",
+                    "detail": f"Only {job.issued_count} labels were issued in this run.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     reconcile_print_job(
         job=job,
@@ -274,3 +302,4 @@ def reconcile_job(request, job_id):
         actor_description=request.user.get_username(),
     )
     return Response(PrintJobSerializer(job).data)
+

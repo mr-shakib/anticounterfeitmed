@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { ApiError, Membership, api } from "@/lib/api";
+import { ApiError, Membership, api, portalPath } from "@/lib/api";
 
 type SessionState = {
   membership: Membership | null;
@@ -40,7 +40,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await api.post("/v1/staff/logout");
     setMembership(null);
-    window.location.href = "/login";
+    // A full reload, so nothing from the signed-out session survives in memory.
+    window.location.href = portalPath("/login");
   }, []);
 
   return (

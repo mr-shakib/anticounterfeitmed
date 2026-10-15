@@ -6,10 +6,13 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../core/outcomes.dart';
 import '../data/api_client.dart';
+import '../ui/components.dart';
+import '../ui/theme.dart';
 
 const _reasons = [
   'CODE_NOT_FOUND',
@@ -78,31 +81,80 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context).strings;
+    final tones = AppTones.of(context);
+    final theme = Theme.of(context);
     final caseNumber = _caseNumber;
+
+    if (caseNumber != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(s.reportTitle)),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconBadge(icon: Icons.mark_email_read_outlined, tone: tones.match, size: 84),
+                const SizedBox(height: 20),
+                Text(s.reportFiled, textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 8, 10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: tones.match.border),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: SelectableText(
+                          caseNumber,
+                          style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 1),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        tooltip: MaterialLocalizations.of(context).copyButtonLabel,
+                        icon: const Icon(Icons.copy_rounded),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: caseNumber));
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text(s.copied)));
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        bottomNavigationBar: BottomActionBar(
+          children: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(s.close),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text(s.reportTitle)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
-          if (caseNumber != null)
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.check_circle_outline),
-                title: Text(s.reportFiled),
-                subtitle: SelectableText(caseNumber),
-              ),
-            )
-          else ...[
-            if (_error.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-            Text(s.reportReason, style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 8),
-            RadioGroup<String>(
+          if (_error.isNotEmpty) ...[
+            ToneBanner(tone: tones.danger, icon: Icons.error_outline_rounded, message: _error),
+            const SizedBox(height: 12),
+          ],
+          SectionCard(
+            title: s.reportReason,
+            padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+            child: RadioGroup<String>(
               groupValue: _reason,
               onChanged: (value) => setState(() => _reason = value!),
               child: Column(
@@ -110,44 +162,69 @@ class _ReportScreenState extends State<ReportScreen> {
                     .map((code) => RadioListTile<String>(
                           value: code,
                           title: Text(s.reasonLabel(code)),
-                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                         ))
                     .toList(),
               ),
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _description,
-              decoration: InputDecoration(
-                labelText: s.reportDescription,
-                border: const OutlineInputBorder(),
-              ),
-              maxLines: 3,
+          ),
+          const SizedBox(height: 12),
+          SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Labels sit above the fields rather than inside them: these
+                // run long, in Bangla especially, and an in-field label is cut
+                // off at one line.
+                _FieldLabel(s.reportDescription),
+                TextField(controller: _description, minLines: 3, maxLines: 5),
+                const SizedBox(height: 16),
+                _FieldLabel(s.reportReference),
+                TextField(
+                  controller: _reference,
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.tag_rounded)),
+                ),
+                const SizedBox(height: 16),
+                _FieldLabel(s.reportPharmacy),
+                TextField(
+                  controller: _pharmacy,
+                  decoration:
+                      const InputDecoration(prefixIcon: Icon(Icons.local_pharmacy_outlined)),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reference,
-              decoration: InputDecoration(
-                labelText: s.reportReference,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _pharmacy,
-              decoration: InputDecoration(
-                labelText: s.reportPharmacy,
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: Text(_busy ? s.checking : s.submitReport),
-            ),
-          ],
+          ),
         ],
       ),
+      bottomNavigationBar: BottomActionBar(
+        children: [
+          FilledButton.icon(
+            onPressed: _busy ? null : _submit,
+            icon: _busy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : const Icon(Icons.send_rounded),
+            label: Text(_busy ? s.checking : s.submitReport),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 2),
+      child: Text(text, style: Theme.of(context).textTheme.labelLarge),
     );
   }
 }

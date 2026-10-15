@@ -197,7 +197,7 @@ export function PrintScanner({
     <div className="card">
       <div className="alert info" style={{ marginTop: 0 }}>
         A scan records that the printed code reads back correctly. QC and the
-        scratch coating are recorded separately below: the coating is applied
+        scratch coating are recorded in the next step: the coating is applied
         after scanning and covers the code, so no scan can evidence it.
       </div>
 

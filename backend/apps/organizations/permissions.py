@@ -81,6 +81,11 @@ class IsStaff(permissions.BasePermission):
         if not session_mfa_ok(request, membership):
             self.message = "Second factor required for this role."
             return False
+        if membership.password_change_required:
+            # The temporary password an administrator handed over is known to
+            # two people. Until the owner replaces it, it opens nothing.
+            self.message = "Choose a new password before continuing."
+            return False
         request.membership = membership
         return True
 

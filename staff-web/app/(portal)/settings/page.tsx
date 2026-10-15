@@ -4,6 +4,7 @@ import { useState } from "react";
 import QRCode from "qrcode";
 import { ApiError, Membership, api } from "@/lib/api";
 import { useSession } from "@/components/Session";
+import { Feedback, useAction } from "@/components/Feedback";
 
 export default function SettingsPage() {
   const { membership, refresh } = useSession();
@@ -187,6 +188,78 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      <h2>Password</h2>
+      <PasswordCard />
     </>
+  );
+}
+
+function PasswordCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [repeat, setRepeat] = useState("");
+  const action = useAction();
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    void action.run(async () => {
+      if (next !== repeat) throw new ApiError(400, "MISMATCH", "The two new passwords do not match.");
+      await api.post<Membership>("/v1/staff/password", {
+        current_password: current,
+        new_password: next,
+      });
+      setCurrent("");
+      setNext("");
+      setRepeat("");
+      return "Password changed.";
+    });
+  };
+
+  return (
+    <div className="card">
+      <form onSubmit={submit}>
+        <div className="row">
+          <label>
+            <span>Current password</span>
+            <input
+              type="password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          <label>
+            <span>New password</span>
+            <input
+              type="password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </label>
+          <label>
+            <span>Repeat new password</span>
+            <input
+              type="password"
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+          </label>
+          <div className="shrink">
+            <button type="submit" disabled={action.busy}>
+              {action.busy ? "Saving…" : "Change password"}
+            </button>
+          </div>
+        </div>
+        <Feedback error={action.error} notice={action.notice} />
+      </form>
+    </div>
   );
 }

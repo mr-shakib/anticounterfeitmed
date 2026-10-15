@@ -18,35 +18,81 @@ from rest_framework.decorators import (
 from rest_framework.response import Response
 
 from apps.audit.models import AuditAction, AuditEvent
-from apps.organizations.models import ApprovalStatus, Organization
+from apps.organizations.models import ApprovalStatus, Organization, OrganizationType
 from apps.organizations.permissions import STAFF_AUTH, IsPlatformAdmin
 from apps.reports.models import Report, ReportStatus
+from apps.trust.services import (
+    NoUsableKey,
+    ensure_activation_key,
+    organizations_with_activation_key,
+)
+from apps.trust.signing import SignerUnavailable
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
+    has_signing_key = serializers.SerializerMethodField()
+
     class Meta:
         model = Organization
         fields = [
             "id", "name", "type", "contact_email", "contact_phone",
             "approval_status", "approved_at", "is_suspended", "suspended_at",
-            "suspension_reason", "created_at",
+            "suspension_reason", "has_signing_key", "created_at",
         ]
         read_only_fields = ["id", "approved_at", "suspended_at", "created_at"]
+
+    def get_has_signing_key(self, org: Organization) -> bool:
+        keyed = self.context.get("keyed")
+        if keyed is None:
+            keyed = organizations_with_activation_key([org.id])
+        return org.id in keyed
+
+
+class CreateOrganizationSerializer(serializers.ModelSerializer):
+    """A manufacturer, entered by the platform. It starts pending approval."""
+
+    class Meta:
+        model = Organization
+        fields = ["name", "contact_email", "contact_phone"]
+        extra_kwargs = {"contact_email": {"required": True, "allow_blank": False}}
+
+    def validate_name(self, value: str) -> str:
+        value = value.strip()
+        if Organization.objects.filter(name__iexact=value).exists():
+            raise serializers.ValidationError("An organization with this name already exists.")
+        return value
 
 
 class ReasonSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=1000)
 
 
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 @authentication_classes(STAFF_AUTH)
 @permission_classes([IsPlatformAdmin])
 def organizations(request):
+    if request.method == "POST":
+        serializer = CreateOrganizationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            org = serializer.save(
+                type=OrganizationType.MANUFACTURER,
+                approval_status=ApprovalStatus.PENDING,
+            )
+            AuditEvent.objects.create(
+                action=AuditAction.ORGANIZATION_CREATED,
+                organization=org,
+                actor_user=request.user,
+            )
+        return Response(OrganizationSerializer(org).data, status=status.HTTP_201_CREATED)
+
     queryset = Organization.objects.all().order_by("name")
     state = request.query_params.get("approval_status")
     if state:
         queryset = queryset.filter(approval_status=state)
-    return Response(OrganizationSerializer(queryset, many=True).data)
+    rows = list(queryset)
+    keyed = organizations_with_activation_key([o.id for o in rows])
+    return Response(OrganizationSerializer(rows, many=True, context={"keyed": keyed}).data)
 
 
 @api_view(["POST"])
@@ -56,20 +102,52 @@ def approve_organization(request, organization_id):
     """Approve a manufacturer to issue and activate.
 
     Approval must be recorded before production issuance, so this is the gate
-    that lets a manufacturer generate its first serial.
+    that lets a manufacturer generate its first serial. It is also where the
+    issuer-key association docs/10 asks for is made: a manufacturer without a
+    key is given one here, so an approved manufacturer can always activate.
+    Either both happen or neither does.
     """
     org = Organization.objects.filter(pk=organization_id).first()
     if org is None:
         return Response({"code": "NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
 
-    with transaction.atomic():
-        org.approval_status = ApprovalStatus.APPROVED
-        org.approved_at = timezone.now()
-        org.save(update_fields=["approval_status", "approved_at"])
-        AuditEvent.objects.create(
-            action=AuditAction.ORGANIZATION_APPROVED,
-            organization=org,
-            actor_user=request.user,
+    try:
+        with transaction.atomic():
+            key = (
+                ensure_activation_key(org)
+                if org.type == OrganizationType.MANUFACTURER
+                else None
+            )
+            org.approval_status = ApprovalStatus.APPROVED
+            org.approved_at = timezone.now()
+            org.save(update_fields=["approval_status", "approved_at"])
+            AuditEvent.objects.create(
+                action=AuditAction.ORGANIZATION_APPROVED,
+                organization=org,
+                actor_user=request.user,
+                detail={"signing_key_provisioned": key.key_id} if key else {},
+            )
+    except NoUsableKey:
+        return Response(
+            {
+                "code": "NO_ROOT_KEY",
+                "detail": (
+                    "This instance has no root signing key yet. Run "
+                    "infra/provision-keys.sh once, then approve again."
+                ),
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+    except SignerUnavailable:
+        return Response(
+            {
+                "code": "SIGNER_UNAVAILABLE",
+                "detail": (
+                    "The signing service did not respond, so no key could be "
+                    "created. Nothing was approved; try again shortly."
+                ),
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     return Response(OrganizationSerializer(org).data)
 

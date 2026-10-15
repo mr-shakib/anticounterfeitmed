@@ -32,6 +32,15 @@ function apiPath(path: string): string {
   return `${BASE_PATH}${path}`;
 }
 
+/**
+ * A portal page's full URL path, for the few places that leave Next's router
+ * (a hard navigation). `Link` and `router` add the mount point themselves;
+ * `window.location` does not, and "/login" alone lands on the hub's 404.
+ */
+export function portalPath(path: string): string {
+  return `${BASE_PATH}${path}`;
+}
+
 function csrfToken(): string {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
@@ -71,16 +80,39 @@ async function request<T>(
     throw new ApiError(
       response.status,
       String(data.code ?? "ERROR"),
-      String(data.detail ?? response.statusText),
+      String(data.detail ?? fieldErrors(data) ?? response.statusText),
       payload,
     );
   }
   return payload as T;
 }
 
+/**
+ * A validation refusal as one readable sentence.
+ *
+ * Django REST framework reports these per field, with no `detail`, so without
+ * this a form refusal surfaced as the bare words "Bad Request".
+ */
+function fieldErrors(data: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  for (const [field, value] of Object.entries(data)) {
+    if (field === "code") continue;
+    const messages = (Array.isArray(value) ? value : [value]).map(String).join(" ");
+    if (!messages) continue;
+    const name = field.replace(/_/g, " ");
+    parts.push(
+      field === "non_field_errors"
+        ? messages
+        : `${name.charAt(0).toUpperCase()}${name.slice(1)}: ${messages}`,
+    );
+  }
+  return parts.length ? parts.join(" ") : undefined;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body ?? {}),
+  patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
 };
 
 /**
@@ -116,6 +148,8 @@ export type Membership = {
   mfa_enrolment_required: boolean;
   mfa_enrolled: boolean;
   mfa_verified: boolean;
+  /** Signed in with an administrator's temporary password; must replace it. */
+  password_change_required: boolean;
 };
 
 export type Product = {
@@ -126,6 +160,8 @@ export type Product = {
   dosage_form: string;
   pack_description: string;
   registration_reference: string;
+  /** Optional prescribing information, keyed by section. */
+  information: Record<string, string>;
 };
 
 export type Batch = {
@@ -139,6 +175,15 @@ export type Batch = {
   is_recalled: boolean;
   recalled_at: string | null;
   recall_notice: string;
+  /** Present on the batch list only. */
+  progress?: BatchProgress;
+};
+
+/** Where a batch stands, as the batch list reports it. */
+export type BatchProgress = {
+  units_total: number;
+  counts_by_lifecycle: Record<string, number>;
+  units_ready: number;
 };
 
 export type Unit = {
@@ -162,6 +207,10 @@ export type BatchUnits = {
   units_ready: number;
   /** The subset of PRINTED records this system observed, rather than was told. */
   units_scan_verified: number;
+  units_blocked: number;
+  /** How many units match the search, of which `units` is one page. */
+  units_matching: number;
+  offset: number;
   units: Unit[];
 };
 
@@ -172,8 +221,11 @@ export type ActivationJob = {
   requested: number;
   succeeded: number;
   failed: number;
+  created_at: string;
   finished_at: string | null;
-  failures: { unit_id: string; reason: string }[];
+  failures: { unit_id: string; external_reference: string; reason: string }[];
+  /** Whole-batch runs only: units that were not candidates, by state. */
+  not_attempted?: Record<string, number>;
 };
 
 export type PrintJob = {
@@ -183,6 +235,8 @@ export type PrintJob = {
   issued_count: number;
   status: string;
   reconciled_at: string | null;
+  reconciled_printed: number | null;
+  reconciled_rejected: number | null;
   export_available: boolean;
   export_expires_at: string | null;
   export_deleted_at: string | null;
@@ -207,6 +261,9 @@ export type Organization = {
   is_suspended: boolean;
   suspension_reason: string;
   contact_email: string;
+  contact_phone: string;
+  /** Holds an active key to sign its units' credentials. */
+  has_signing_key: boolean;
   created_at: string;
 };
 
@@ -233,12 +290,16 @@ export type Report = {
   created_at: string;
 };
 
-export type Membership2 = {
+/** A row in the administrator's staff list. */
+export type StaffRow = {
   membership_id: string;
   username: string;
   organization: string;
-  role: string;
+  organization_id: string;
+  role: Membership["role"];
   is_enabled: boolean;
+  disabled_at: string | null;
+  password_change_required: boolean;
   mfa_required: boolean;
   mfa_enrolled: boolean;
 };

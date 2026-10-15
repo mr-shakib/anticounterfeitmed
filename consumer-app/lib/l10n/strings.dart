@@ -33,6 +33,16 @@ class Strings {
   String get retry => _pick('Try again', 'আবার চেষ্টা করুন');
   String get cancel => _pick('Cancel', 'বাতিল');
 
+  // --- settings ------------------------------------------------------------
+  // Bangla below is a working draft, like the rest (decision D10).
+  String get settingsTitle => _pick('Settings', 'সেটিংস');
+  String get languageLabel => _pick('Language', 'ভাষা');
+  String get appearanceLabel => _pick('Appearance', 'চেহারা');
+  String get themeLight => _pick('Light', 'লাইট');
+  String get themeDark => _pick('Dark', 'ডার্ক');
+  String get themeSystem => _pick('Phone setting', 'ফোনের সেটিং');
+  String get copied => _pick('Copied', 'কপি হয়েছে');
+
   // --- scanning ------------------------------------------------------------
   String get scanInstruction => _pick(
         'Scratch off the silver coating on the strip, then point the camera at the code.',
@@ -54,6 +64,10 @@ class Strings {
             'স্ট্রিপে ছাপানো রেফারেন্স ব্যবহার করে আপনি এখনো উদ্বেগ জানাতে পারেন।',
       );
   String get checking => _pick('Checking…', 'যাচাই করা হচ্ছে…');
+  // Guidance while a code is in view but not yet readable. Bangla drafts (D10).
+  String get moveCloser =>
+      _pick('Move the phone closer to the code', 'ফোনটি কোডের আরও কাছে আনুন');
+  String get holdSteady => _pick('Hold the phone steady', 'ফোনটি স্থির রাখুন');
 
   // --- package preview -----------------------------------------------------
   String get packageTitle => _pick('Package details', 'প্যাকেটের তথ্য');
@@ -66,6 +80,34 @@ class Strings {
   String get batch => _pick('Batch', 'ব্যাচ');
   String get manufacturedOn => _pick('Manufactured', 'প্রস্তুতের তারিখ');
   String get expiresOn => _pick('Expires', 'মেয়াদ শেষ');
+
+  // --- medicine information ----------------------------------------------
+  // Headings are working drafts like the rest of the Bangla (decision D10).
+  String get informationTitle => _pick('Medicine information', 'ওষুধের তথ্য');
+  String get informationSource =>
+      _pick('Provided by the manufacturer', 'প্রস্তুতকারকের দেওয়া তথ্য');
+
+  /// The standard advice printed with medicine information in Bangladesh.
+  String get physicianAdvice => _pick(
+        'Take medicine as advised by a registered physician.',
+        'রেজিস্টার্ড চিকিৎসকের পরামর্শ মোতাবেক ঔষধ সেবন করুন।',
+      );
+
+  String? informationHeading(String field) => switch (field) {
+        'indications' => _pick('Indications', 'নির্দেশনা'),
+        'therapeutic_class' => _pick('Therapeutic class', 'থেরাপিউটিক শ্রেণি'),
+        'pharmacology' => _pick('Pharmacology', 'ফার্মাকোলজি'),
+        'dosage_administration' => _pick('Dosage & administration', 'মাত্রা ও সেবনবিধি'),
+        'interaction' => _pick('Interaction', 'অন্যান্য ওষুধের সাথে প্রতিক্রিয়া'),
+        'contraindications' => _pick('Contraindications', 'প্রতিনির্দেশনা'),
+        'side_effects' => _pick('Side effects', 'পার্শ্বপ্রতিক্রিয়া'),
+        'pregnancy_lactation' => _pick('Pregnancy & lactation', 'গর্ভাবস্থা ও স্তন্যদান'),
+        'precautions_warnings' => _pick('Precautions & warnings', 'সতর্কতা'),
+        'overdose_effects' => _pick('Overdose effects', 'মাত্রাতিরিক্ত সেবনের প্রভাব'),
+        'reconstitution' => _pick('Reconstitution', 'দ্রবণ প্রস্তুতি'),
+        'storage_conditions' => _pick('Storage conditions', 'সংরক্ষণ'),
+        _ => null,
+      };
 
   String get verifyAction => _pick('Verify this package', 'এই প্যাকেটটি যাচাই করুন');
   String get verifyExplanation => _pick(

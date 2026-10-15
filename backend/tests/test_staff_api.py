@@ -416,14 +416,22 @@ def test_label_export_is_returned_once_and_never_again(make_manufacturer):
 @pytest.mark.django_db(transaction=True)
 def test_activation_reports_partial_failure_honestly(make_manufacturer):
     actor = make_manufacturer("Alpha")
-    result = create_print_job(batch=actor["batch"], count=2)
+    result = create_print_job(batch=actor["batch"], count=3)
     units = [PackageUnit.objects.get(pk=u.unit_id) for u in result.units]
 
-    # Only the first unit is taken through manufacturing.
-    for step in (ManufacturingStep.PRINTED, ManufacturingStep.QC_PASSED,
-                 ManufacturingStep.COATED):
-        record_completion(unit=units[0], step=step, completed_at=timezone.now(),
-                          recorded_by=actor["user"], source_reference="log")
+    # Two units are taken through manufacturing and the second is then
+    # blocked: a real failure. The third is only printed, so it is not a
+    # candidate at all.
+    for unit in units[:2]:
+        for step in (ManufacturingStep.PRINTED, ManufacturingStep.QC_PASSED,
+                     ManufacturingStep.COATED):
+            record_completion(unit=unit, step=step, completed_at=timezone.now(),
+                              recorded_by=actor["user"], source_reference="log")
+    record_completion(unit=units[2], step=ManufacturingStep.PRINTED,
+                      completed_at=timezone.now(), recorded_by=actor["user"],
+                      source_reference="log")
+    units[1].is_blocked = True
+    units[1].save(update_fields=["is_blocked"])
 
     client = APIClient()
     sign_in(client, actor)
@@ -437,6 +445,41 @@ def test_activation_reports_partial_failure_honestly(make_manufacturer):
     assert response.data["failed"] == 1
     assert response.data["status"] == "COMPLETED_WITH_FAILURES"
     assert response.data["failures"], "the portal must be able to show why"
+    assert "blocked" in response.data["failures"][0]["reason"]
+    # Not a failure, but not hidden either.
+    assert response.data["not_attempted"] == {UnitLifecycle.PRINTED: 1}
+
+
+@pytest.mark.django_db(transaction=True)
+def test_activating_a_batch_twice_does_not_report_the_first_run_as_failures(
+    make_manufacturer,
+):
+    """Activating in waves is ordinary; the second run is not a failed one."""
+    actor = make_manufacturer("Alpha")
+    result = create_print_job(batch=actor["batch"], count=2)
+    units = [PackageUnit.objects.get(pk=u.unit_id) for u in result.units]
+    steps = (ManufacturingStep.PRINTED, ManufacturingStep.QC_PASSED, ManufacturingStep.COATED)
+
+    client = APIClient()
+    sign_in(client, actor)
+    for unit in units:
+        for step in steps:
+            record_completion(unit=unit, step=step, completed_at=timezone.now(),
+                              recorded_by=actor["user"], source_reference="log")
+        response = client.post(
+            reverse("staff-activation-jobs"),
+            {"batch": str(actor["batch"].id)},
+            format="json",
+        )
+        assert response.status_code == 201
+        assert response.data["status"] == "COMPLETED"
+        assert response.data["succeeded"] == 1
+
+    assert response.data["not_attempted"] == {UnitLifecycle.ACTIVE: 1}
+    nothing_left = client.post(
+        reverse("staff-activation-jobs"), {"batch": str(actor["batch"].id)}, format="json"
+    )
+    assert nothing_left.status_code == 400
 
 
 # --- CSRF -------------------------------------------------------------------

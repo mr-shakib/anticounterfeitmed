@@ -81,6 +81,10 @@ if it is missing or incomplete.
 `provision-keys.sh` refuses to run twice. Replacing a key that has already
 signed credentials would leave those credentials unverifiable.
 
+It covers the manufacturers that exist when it runs. One added later through
+the portal gets its key when an administrator approves it (doc 10), which also
+republishes the manifest; no shell access is needed.
+
 Add `infra/nginx/api-subdomain.conf` to the host's nginx, then issue the
 certificate:
 

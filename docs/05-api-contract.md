@@ -21,9 +21,17 @@ Source: SRS §5.3, §4.3. All paths are proposed contracts; organization- and ob
 | `POST /v1/batches` | Manufacturer | Create batch |
 | `POST /v1/print-jobs` | Manufacturer | Generate serials/tokens + controlled label export. Each entry is `{external_reference, qr: {version: 6, error_correction: "Q", data_codewords: <hex>}}` — the symbol's data codewords, never a URL (doc 09, D21). |
 | `POST /v1/print-scans` | Authorized mfr. staff | Read one printed code back on the line. Takes a **raw token**, stores only its digest, and records `PRINTED` as scan evidence. Refused once a unit is past `CREATED`. |
-| `POST /v1/manufacturing-confirmations` | Authorized mfr. staff | Record printed/QC/coated for a whole batch or an exact unit list, with completion time + source reference |
-| `POST /v1/activation-jobs` | Mfr. release manager | Approve / sign / activate eligible units |
+| `POST /v1/manufacturing-confirmations` | Authorized mfr. staff | Record printed/QC/coated for a whole batch, an exact unit list, or `external_references` within a batch, with completion time + source reference. A QC rejection needs a `reason`; rejecting a **whole batch** also needs `confirm_batch_number` equal to the batch number. An unknown reference records nothing. |
+| `POST /v1/activation-jobs` | Mfr. release manager | Approve / sign / activate eligible units. A whole-batch run covers the batch's coated units; the rest are reported as `not_attempted` by state, not as failures. |
 | `GET /v1/activation-jobs/{id}` | Authorized mfr. | Per-unit results and failure counts |
+| `GET /v1/staff/batches/{id}/activation-jobs` | Authorized mfr. | A batch's activation runs, newest first, so results outlive the page |
+| `GET /v1/staff/batches` | Authorized mfr. | Batches, each with `progress`: units by state and the activation-ready count |
+| `GET /v1/staff/batches/{id}/units` | Authorized mfr. | Counts plus one page of units: `q` (reference search), `lifecycle`, `blocked=true`, `offset`, `limit` ≤ 500 |
+| `POST /v1/staff/password` | Signed-in staff | Change own password; needs the current one, and a cleared second factor where one is enrolled |
+| `GET`/`POST /v1/admin/organizations` | Platform admin | List organizations; add a manufacturer (starts pending) |
+| `POST /v1/admin/organizations/{id}/approve` | Platform admin | Approve; a manufacturer without an active key is given one and the trust manifest is republished, in one transaction. Refused (`NO_ROOT_KEY`) before `provision-keys.sh` has run |
+| `GET`/`POST /v1/admin/memberships` | Platform admin | List staff; add one. The response carries a temporary password **once**, which opens only the password change |
+| `POST /v1/admin/memberships/{id}/disable` · `/enable` | Platform admin | Revoke access with a reason, or restore it. An admin cannot revoke their own |
 | `POST /v1/consumer/verifications/prepare` | Attested session | Fetch signed info/status; issue challenge. **Does not redeem.** |
 | `POST /v1/consumer/verifications/confirm` | Attested session | Commit first or repeat check, idempotently |
 | `POST /v1/consumer/operations/{id}/status` | Owning session | Recover result with fresh nonce. **No new check.** |

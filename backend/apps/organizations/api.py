@@ -7,7 +7,19 @@ attacker holding only a password reaches nothing a release manager can do.
 
 from __future__ import annotations
 
-from django.contrib.auth import authenticate, login, logout
+import secrets
+
+from django.contrib.auth import (
+    authenticate,
+    get_user_model,
+    login,
+    logout,
+    password_validation,
+    update_session_auth_hash,
+)
+from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers, status
 from rest_framework.decorators import (
@@ -20,7 +32,12 @@ from rest_framework.response import Response
 
 from apps.audit.models import AuditAction, AuditEvent
 from apps.organizations import mfa
-from apps.organizations.models import StaffMembership
+from apps.organizations.models import (
+    Organization,
+    OrganizationType,
+    StaffMembership,
+    StaffRole,
+)
 from apps.organizations.permissions import (
     STAFF_AUTH,
     IsPlatformAdmin,
@@ -31,6 +48,15 @@ from apps.organizations.permissions import (
     staff_mfa_required,
 )
 
+User = get_user_model()
+
+#: Which roles each kind of organization can hold. A manufacturer never has a
+#: platform admin, and the platform never has a release manager.
+ROLES_FOR_ORGANIZATION = {
+    OrganizationType.PLATFORM: {StaffRole.PLATFORM_ADMIN},
+    OrganizationType.MANUFACTURER: {StaffRole.RELEASE_MANAGER, StaffRole.MANUFACTURER_STAFF},
+}
+
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
@@ -39,6 +65,21 @@ class LoginSerializer(serializers.Serializer):
 
 class CodeSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=10)
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=256, trim_whitespace=False)
+    new_password = serializers.CharField(max_length=256, trim_whitespace=False)
+
+
+class CreateMembershipSerializer(serializers.Serializer):
+    organization = serializers.UUIDField()
+    username = serializers.CharField(max_length=150, validators=[UnicodeUsernameValidator()])
+    role = serializers.ChoiceField(choices=[c[0] for c in StaffRole.choices])
+
+
+class RevokeSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=1000)
 
 
 def _membership_payload(membership: StaffMembership, request) -> dict:
@@ -61,6 +102,9 @@ def _membership_payload(membership: StaffMembership, request) -> dict:
         "mfa_enrolment_required": membership.is_privileged and staff_mfa_required(),
         "mfa_enrolled": membership.has_mfa,
         "mfa_verified": session_mfa_ok(request, membership),
+        # An administrator set a temporary password; nothing else works until
+        # the owner replaces it.
+        "password_change_required": membership.password_change_required,
     }
 
 
@@ -260,6 +304,71 @@ def mfa_disable(request):
 
 @api_view(["POST"])
 @authentication_classes(STAFF_AUTH)
+@permission_classes([AllowAny])
+def change_password(request):
+    """Replace the caller's password.
+
+    Reachable with a password-authenticated session alone, because that is all
+    someone holding an administrator's temporary password has. Where a second
+    factor is enrolled it must have been cleared first: otherwise a leaked
+    password would be enough to lock the owner out of their own account.
+    """
+    membership = membership_for(request)
+    if membership is None:
+        return Response(
+            {"code": "NOT_AUTHENTICATED", "detail": "Log in first."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    if membership.has_mfa and not session_mfa_ok(request, membership):
+        return Response(
+            {"code": "MFA_REQUIRED", "detail": "Enter your second-factor code first."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    serializer = PasswordChangeSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user = membership.user
+    current = serializer.validated_data["current_password"]
+    new = serializer.validated_data["new_password"]
+
+    if not user.check_password(current):
+        return Response(
+            {"code": "INVALID_CREDENTIALS", "detail": "The current password is not correct."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if new == current:
+        return Response(
+            {"code": "PASSWORD_UNCHANGED", "detail": "Choose a password you have not used here."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        password_validation.validate_password(new, user)
+    except DjangoValidationError as exc:
+        return Response(
+            {"code": "WEAK_PASSWORD", "detail": " ".join(exc.messages)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    with transaction.atomic():
+        user.set_password(new)
+        user.save(update_fields=["password"])
+        StaffMembership.objects.filter(user=user).update(password_change_required=False)
+        AuditEvent.objects.create(
+            action=AuditAction.STAFF_PASSWORD_CHANGED,
+            organization=membership.organization,
+            actor_user=user,
+            detail={"membership_id": str(membership.id)},
+        )
+
+    # Changing the password rotates the session hash; keep this session signed
+    # in rather than sending the person straight back to the login form.
+    update_session_auth_hash(request, user)
+    membership.refresh_from_db()
+    return Response(_membership_payload(membership, request))
+
+
+@api_view(["POST"])
+@authentication_classes(STAFF_AUTH)
 @permission_classes([IsPlatformAdmin])
 def reset_membership_mfa(request, membership_id):
     """Clear a staff member's second factor so they can enrol again.
@@ -288,25 +397,150 @@ def reset_membership_mfa(request, membership_id):
     return Response({"membership_id": str(membership.id), "mfa_enrolled": False})
 
 
-@api_view(["GET"])
+def _staff_row(m: StaffMembership) -> dict:
+    return {
+        "membership_id": str(m.id),
+        "username": m.user.get_username(),
+        "organization": m.organization.name,
+        "organization_id": str(m.organization_id),
+        "role": m.role,
+        "is_enabled": m.is_enabled,
+        "disabled_at": m.disabled_at.isoformat() if m.disabled_at else None,
+        "password_change_required": m.password_change_required,
+        "mfa_required": m.is_privileged,
+        "mfa_enrolled": m.has_mfa,
+    }
+
+
+@api_view(["GET", "POST"])
 @authentication_classes(STAFF_AUTH)
 @permission_classes([IsPlatformAdmin])
-def list_memberships(request):
-    """Staff across all organizations, for access review."""
-    memberships = StaffMembership.objects.select_related(
-        "user", "organization"
-    ).order_by("organization__name", "user__username")
-    return Response(
-        [
+def memberships(request):
+    """Staff across all organizations, for access review -- and adding to them.
+
+    A new account gets a temporary password generated here and returned once.
+    It opens nothing but the password-change step, so the administrator who saw
+    it cannot go on using it after the owner has signed in. The password is not
+    stored anywhere but the hash, and never reaches the audit record.
+    """
+    if request.method == "GET":
+        rows = StaffMembership.objects.select_related("user", "organization").order_by(
+            "organization__name", "user__username"
+        )
+        return Response([_staff_row(m) for m in rows])
+
+    serializer = CreateMembershipSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    organization = Organization.objects.filter(pk=data["organization"]).first()
+    if organization is None:
+        return Response(
+            {"code": "NOT_FOUND", "detail": "No such organization."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    if data["role"] not in ROLES_FOR_ORGANIZATION.get(organization.type, set()):
+        return Response(
             {
-                "membership_id": str(m.id),
-                "username": m.user.get_username(),
-                "organization": m.organization.name,
-                "role": m.role,
-                "is_enabled": m.is_enabled,
-                "mfa_required": m.is_privileged,
-                "mfa_enrolled": m.has_mfa,
-            }
-            for m in memberships
-        ]
+                "code": "ROLE_NOT_ALLOWED",
+                "detail": f"A {organization.get_type_display().lower()} cannot hold that role.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if User.objects.filter(username__iexact=data["username"]).exists():
+        return Response(
+            {"code": "USERNAME_TAKEN", "detail": "That username is already in use."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    temporary_password = secrets.token_urlsafe(12)
+    with transaction.atomic():
+        user = User.objects.create_user(
+            username=data["username"], password=temporary_password
+        )
+        membership = StaffMembership.objects.create(
+            user=user,
+            organization=organization,
+            role=data["role"],
+            password_change_required=True,
+        )
+        AuditEvent.objects.create(
+            action=AuditAction.STAFF_CREATED,
+            organization=organization,
+            actor_user=request.user,
+            reason=f"{user.get_username()} added as {membership.get_role_display().lower()}",
+            detail={"membership_id": str(membership.id), "role": membership.role},
+        )
+
+    membership = StaffMembership.objects.select_related("user", "organization").get(
+        pk=membership.pk
     )
+    response = Response(
+        {**_staff_row(membership), "temporary_password": temporary_password},
+        status=status.HTTP_201_CREATED,
+    )
+    # Holds a credential: nothing between here and the browser may keep it.
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@api_view(["POST"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsPlatformAdmin])
+def disable_membership(request, membership_id):
+    """Revoke a staff member's access, with a reason. Takes effect on their next request."""
+    serializer = RevokeSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    membership = (
+        StaffMembership.objects.select_related("user", "organization")
+        .filter(pk=membership_id)
+        .first()
+    )
+    if membership is None:
+        return Response({"code": "NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
+    if membership.pk == request.membership.pk:
+        # Otherwise the last administrator could lock the platform out of itself.
+        return Response(
+            {"code": "CANNOT_DISABLE_SELF", "detail": "You cannot revoke your own access."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    with transaction.atomic():
+        membership.is_enabled = False
+        membership.disabled_at = timezone.now()
+        membership.save(update_fields=["is_enabled", "disabled_at"])
+        AuditEvent.objects.create(
+            action=AuditAction.STAFF_DISABLED,
+            organization=membership.organization,
+            actor_user=request.user,
+            reason=serializer.validated_data["reason"],
+            detail={"membership_id": str(membership.id), "username": membership.user.get_username()},
+        )
+    return Response(_staff_row(membership))
+
+
+@api_view(["POST"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsPlatformAdmin])
+def enable_membership(request, membership_id):
+    """Restore access revoked by mistake. Recorded like the revocation was."""
+    membership = (
+        StaffMembership.objects.select_related("user", "organization")
+        .filter(pk=membership_id)
+        .first()
+    )
+    if membership is None:
+        return Response({"code": "NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
+
+    with transaction.atomic():
+        membership.is_enabled = True
+        membership.disabled_at = None
+        membership.save(update_fields=["is_enabled", "disabled_at"])
+        AuditEvent.objects.create(
+            action=AuditAction.STAFF_ENABLED,
+            organization=membership.organization,
+            actor_user=request.user,
+            detail={"membership_id": str(membership.id), "username": membership.user.get_username()},
+        )
+    return Response(_staff_row(membership))

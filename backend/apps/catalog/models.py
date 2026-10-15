@@ -14,6 +14,29 @@ from django.db import models
 
 from apps.organizations.models import Organization
 
+#: Optional prescribing information, in the order the app shows it. The keys are
+#: the wire names; the app has its own reviewed heading for each.
+PRODUCT_INFORMATION_FIELDS: tuple[str, ...] = (
+    "indications",
+    "therapeutic_class",
+    "pharmacology",
+    "dosage_administration",
+    "interaction",
+    "contraindications",
+    "side_effects",
+    "pregnancy_lactation",
+    "precautions_warnings",
+    "overdose_effects",
+    "reconstitution",
+    "storage_conditions",
+)
+
+#: Per section, and in total. The total keeps a signed status statement well
+#: under the signing service's 64 KB payload limit; it is counted in UTF-8
+#: bytes because Bangla takes three per character.
+PRODUCT_INFORMATION_MAX_CHARS = 4000
+PRODUCT_INFORMATION_MAX_BYTES = 48_000
+
 
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -30,6 +53,12 @@ class Product(models.Model):
         help_text="The unit as sold, e.g. 'Strip of 10 tablets'.",
     )
     registration_reference = models.CharField(max_length=100, blank=True)
+
+    #: Optional prescribing information, keyed by PRODUCT_INFORMATION_FIELDS.
+    #: Not part of the frozen credential: it travels in the signed status
+    #: statement at check time, so a correction reaches the app at once. The
+    #: app labels it as provided by the manufacturer.
+    information = models.JSONField(default=dict, blank=True)
 
     reference_image_key = models.CharField(
         max_length=500,

@@ -62,10 +62,10 @@ export default function AuditPage() {
         <tbody>
           {entries.map((e) => (
             <tr key={e.id}>
-              <td className="muted">{new Date(e.created_at).toLocaleString()}</td>
-              <td>{e.action.replace(/_/g, " ").toLowerCase()}</td>
-              <td>{e.organization ?? "—"}</td>
-              <td className="muted">{e.actor ?? "—"}</td>
+              <td className="muted nowrap">{new Date(e.created_at).toLocaleString()}</td>
+              <td className="nowrap">{e.action.replace(/_/g, " ").toLowerCase()}</td>
+              <td className="nowrap">{e.organization ?? "—"}</td>
+              <td className="muted nowrap">{e.actor ?? "—"}</td>
               <td className="muted mono">
                 {e.reason || Object.entries(e.detail ?? {}).map(([k, v]) => `${k}=${v}`).join(" ") || "—"}
               </td>

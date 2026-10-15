@@ -60,6 +60,7 @@ def sign_status(
     operation_id: str | None = None,
     event_id: str | None = None,
     now: datetime | None = None,
+    product_information: list[dict[str, str]] | None = None,
 ) -> SignedEnvelope:
     """Build and sign a statement of current status.
 
@@ -83,6 +84,7 @@ def sign_status(
         expires_at=now + timedelta(seconds=settings.STATUS_ENVELOPE_TTL_SECONDS),
         operation_id=operation_id,
         event_id=event_id,
+        product_information=product_information,
     )
     payload = canonicalise(record)
     signature = get_signer().sign(

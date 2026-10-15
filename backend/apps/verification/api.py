@@ -123,12 +123,22 @@ def prepare(request):
 
         credential_digest = digest_of(result.credential_bytes)
 
+    # The manufacturer's prescribing information goes with the package details:
+    # only when a credential is shown, never for an unknown, inactive or
+    # restricted code.
+    information = None
+    if result.credential_bytes is not None and result.unit is not None:
+        from apps.catalog.services import product_information_entries
+
+        information = product_information_entries(result.unit.batch.product)
+
     envelope = sign_status(
         unit=result.unit,
         outcome=result.outcome,
         restrictions=result.restrictions,
         request_nonce=nonce,
         credential_digest=credential_digest,
+        product_information=information,
     )
 
     body = {

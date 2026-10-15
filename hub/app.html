@@ -9,54 +9,71 @@
 <link rel="icon" href="favicon.png" type="image/png">
 <style>
   :root {
-    --bg: #f6f8fa; --surface: #ffffff; --border: #d8dee7;
-    --text: #12181f; --muted: #5a6572;
-    --accent: #0b6b5e; --accent-text: #ffffff;
-    --warn-bg: #fff8e6; --warn-border: #e8cf8a; --warn: #8a6100;
-    --radius: 10px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f1419; --surface: #171e26; --border: #2b3742;
-      --text: #eef2f7; --muted: #9aa6b4;
-      --accent: #3fbfa8; --accent-text: #08201c;
-      --warn-bg: #2b2415; --warn-border: #5c4f2a; --warn: #e0b95a;
-    }
+    color-scheme: light;
+    --bg: #f4f6f8; --surface: #ffffff; --surface-2: #f8fafb; --border: #e3e8ee;
+    --text: #0f1b2a; --text-2: #334155; --muted: #64748b;
+    --accent: #0b7a6b; --accent-hover: #08685b; --accent-soft: #e7f5f2; --accent-text: #ffffff;
+    --warn: #7a4a06; --warn-bg: #fffaeb; --warn-border: #fedf89;
+    --radius: 14px;
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
+    margin: 0; color: var(--text);
+    background: radial-gradient(900px 420px at 50% -8%, #dff1ed 0%, transparent 70%), var(--bg);
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
-    line-height: 1.55; font-size: 16px;
-  }
-  .wrap { max-width: 34rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
-  header { margin-bottom: 1.5rem; }
-  header img { width: 56px; height: 56px; display: block; margin-bottom: .5rem; }
-  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
-  .bn { color: var(--muted); }
-  h2 { font-size: 1.05rem; margin: 1.8rem 0 .6rem; }
-  ol { padding-left: 1.2rem; margin: 0; }
-  li { margin-bottom: .9rem; }
-  li .bn { display: block; font-size: .93rem; margin-top: .15rem; }
-  .download {
-    display: inline-block; background: var(--accent); color: var(--accent-text);
-    padding: .8rem 1.3rem; border-radius: var(--radius);
-    text-decoration: none; font-weight: 600;
-  }
-  .download:hover { text-decoration: none; opacity: .92; }
-  .meta { font-size: .85rem; color: var(--muted); margin-top: .5rem; }
-  .note {
-    background: var(--warn-bg); border: 1px solid var(--warn-border);
-    border-radius: var(--radius); padding: .9rem 1rem; margin: 1.5rem 0;
-    font-size: .93rem;
-  }
-  .note p { margin: 0 0 .4rem; }
-  .note p:last-child { margin-bottom: 0; }
-  footer {
-    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
-    font-size: .86rem; color: var(--muted);
+    line-height: 1.6; font-size: 16px; -webkit-font-smoothing: antialiased;
   }
   a { color: var(--accent); }
+  footer {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+    font-size: .85rem; color: var(--muted); text-align: center;
+  }
+  footer p { margin: 0 0 .35rem; }
+  footer a { font-weight: 600; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .wrap { max-width: 36rem; margin: 0 auto; padding: 2.75rem 1rem 2.5rem; }
+  header { text-align: center; margin-bottom: 1.5rem; }
+  header img { width: 64px; height: 64px; display: block; margin: 0 auto .75rem; border-radius: 50%; }
+  h1 { font-size: 1.6rem; letter-spacing: -.015em; margin: 0 0 .25rem; }
+  .bn { color: var(--muted); }
+  header .bn { margin: 0; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.4rem; box-shadow: 0 1px 3px rgba(15, 27, 42, .06);
+  }
+  .panel > p { margin: 0 0 .5rem; }
+  h2 { font-size: 1.05rem; margin: 1.8rem 0 .7rem; }
+  .download {
+    display: flex; align-items: center; justify-content: center; gap: .55rem;
+    background: var(--accent); color: var(--accent-text);
+    padding: .9rem 1.3rem; border-radius: 12px; margin-top: 1rem;
+    text-decoration: none; font-weight: 700; font-size: 1.02rem;
+    box-shadow: 0 6px 16px -8px rgba(11, 122, 107, .7);
+  }
+  .download:hover { background: var(--accent-hover); }
+  .download svg { width: 20px; height: 20px; }
+  .meta { font-size: .85rem; color: var(--muted); margin: .6rem 0 0; text-align: center; }
+  ol { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+  li {
+    counter-increment: step; position: relative;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: .85rem 1rem .85rem 3.4rem; margin-bottom: .6rem;
+  }
+  li::before {
+    content: counter(step); position: absolute; left: 1rem; top: .85rem;
+    width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 700; font-size: .9rem;
+  }
+  li .bn { display: block; font-size: .93rem; margin-top: .1rem; }
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn);
+    border-radius: 12px; padding: .95rem 1.1rem; margin: 1.5rem 0; font-size: .93rem;
+  }
+  .note p { margin: 0 0 .35rem; }
+  .note p:last-child { margin-bottom: 0; }
+  .note .bn { color: var(--warn); opacity: .9; }
 </style>
 </head>
 <body>
@@ -68,15 +85,15 @@
     <p class="bn">কনজিউমার অ্যাপ</p>
   </header>
 
+  <div class="panel">
   <p>Check whether the code on a medicine strip matches the record its
      manufacturer signed.</p>
   <p class="bn">ওষুধের স্ট্রিপের কোডটি প্রস্তুতকারকের স্বাক্ষরিত রেকর্ডের সঙ্গে
      মেলে কি না তা যাচাই করুন।</p>
-
-  <h2>Install</h2>
-  <a class="download" href="/app/anticounterfeitmed.apk">Download for Android</a>
+  <a class="download" href="/app/anticounterfeitmed.apk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Download for Android</a>
   <p class="meta">Android 6.0 or later. Not yet on Google Play, so your phone
      will ask you to allow installation from this site.</p>
+  </div>
 
   <h2>How to use it / যেভাবে ব্যবহার করবেন</h2>
   <ol>
@@ -103,6 +120,7 @@
 
   <footer>
     <p><a href="/">&larr; Anticounterfeit Med</a></p>
+    <p>Developed by <a href="https://shakibhowlader.online" target="_blank" rel="noopener noreferrer">Shakib Howlader</a></p>
   </footer>
 
 </div>

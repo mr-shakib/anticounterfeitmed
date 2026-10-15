@@ -17,6 +17,7 @@ from apps.organizations.models import Organization
 
 
 class AuditAction(models.TextChoices):
+    ORGANIZATION_CREATED = "ORGANIZATION_CREATED", "Organization created"
     ORGANIZATION_APPROVED = "ORGANIZATION_APPROVED", "Organization approved"
     ORGANIZATION_SUSPENDED = "ORGANIZATION_SUSPENDED", "Organization suspended"
     UNITS_GENERATED = "UNITS_GENERATED", "Units generated"
@@ -28,6 +29,14 @@ class AuditAction(models.TextChoices):
     VERIFICATION_COMMITTED = "VERIFICATION_COMMITTED", "Verification committed"
     KEY_REVOKED = "KEY_REVOKED", "Signing key revoked"
     STAFF_MFA_RESET = "STAFF_MFA_RESET", "Staff second factor reset"
+    STAFF_CREATED = "STAFF_CREATED", "Staff account created"
+    STAFF_DISABLED = "STAFF_DISABLED", "Staff access revoked"
+    STAFF_ENABLED = "STAFF_ENABLED", "Staff access restored"
+    STAFF_PASSWORD_CHANGED = "STAFF_PASSWORD_CHANGED", "Staff password changed"
+    PRODUCT_INFORMATION_UPDATED = (
+        "PRODUCT_INFORMATION_UPDATED",
+        "Product information updated",
+    )
 
 
 class AuditEvent(models.Model):

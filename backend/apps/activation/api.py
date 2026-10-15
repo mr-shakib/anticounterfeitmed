@@ -25,7 +25,7 @@ from apps.organizations.permissions import (
     IsStaff,
     owns,
 )
-from apps.serialization.models import PackageUnit
+from apps.serialization.models import PackageUnit, UnitLifecycle
 
 
 class ActivationRequestSerializer(serializers.Serializer):
@@ -52,10 +52,15 @@ def _job_payload(job: ActivationJob) -> dict:
         "requested": job.requested_count,
         "succeeded": job.succeeded_count,
         "failed": job.failed_count,
+        "created_at": job.created_at.isoformat(),
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
         "failures": [
-            {"unit_id": str(item.unit_id), "reason": item.failure_reason}
-            for item in job.items.filter(succeeded=False)[:200]
+            {
+                "unit_id": str(item.unit_id),
+                "external_reference": item.unit.external_reference,
+                "reason": item.failure_reason,
+            }
+            for item in job.items.filter(succeeded=False).select_related("unit")[:200]
         ],
     }
 
@@ -80,13 +85,28 @@ def activation_jobs(request):
 
     unit_ids = serializer.validated_data.get("unit_ids")
     queryset = PackageUnit.objects.filter(batch=batch)
+    not_attempted: dict[str, int] = {}
     if unit_ids:
         queryset = queryset.filter(pk__in=unit_ids)
+    else:
+        # A whole-batch run is over the units that have reached the end of
+        # manufacturing. The rest -- not yet coated, already active, void --
+        # were never candidates, and counting them as failed activations made
+        # every partial or second run look broken and buried the real failures.
+        # They are still reported, as not attempted, so nothing is hidden.
+        for lifecycle in queryset.exclude(lifecycle=UnitLifecycle.COVERED).values_list(
+            "lifecycle", flat=True
+        ):
+            not_attempted[lifecycle] = not_attempted.get(lifecycle, 0) + 1
+        queryset = queryset.filter(lifecycle=UnitLifecycle.COVERED)
     units = list(queryset)
 
     if not units:
         return Response(
-            {"code": "NO_UNITS", "detail": "No units matched."},
+            {
+                "code": "NO_UNITS",
+                "detail": "No units matched." if unit_ids else "No units in this batch are ready to activate.",
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -98,7 +118,10 @@ def activation_jobs(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    return Response(_job_payload(outcome.job), status=status.HTTP_201_CREATED)
+    return Response(
+        {**_job_payload(outcome.job), "not_attempted": not_attempted},
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["GET"])
@@ -112,6 +135,27 @@ def activation_job_detail(request, job_id):
             status=status.HTTP_404_NOT_FOUND,
         )
     return Response(_job_payload(job))
+
+
+@api_view(["GET"])
+@authentication_classes(STAFF_AUTH)
+@permission_classes([IsManufacturerStaff])
+def batch_activation_jobs(request, batch_id):
+    """A batch's activation runs, newest first.
+
+    The portal used to hold a run's result only in the page that started it, so
+    a reload lost the failures and the way to retry them.
+    """
+    batch = (
+        Batch.objects.select_related("product__manufacturer").filter(pk=batch_id).first()
+    )
+    if batch is None or not owns(request.membership, batch.product.manufacturer):
+        return Response(
+            {"code": "NOT_FOUND", "detail": "No such batch."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    jobs = ActivationJob.objects.filter(batch=batch).order_by("-created_at")[:20]
+    return Response([_job_payload(job) for job in jobs])
 
 
 @api_view(["POST"])

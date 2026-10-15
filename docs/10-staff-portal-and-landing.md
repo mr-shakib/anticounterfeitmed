@@ -32,6 +32,21 @@ compulsory, removal is an administrator action instead.
 
 **Admin must not be able to:** edit signed product data, reset redeemed units to active, or routinely activate on a manufacturer's behalf. Investigations add a conclusion — they never erase history.
 
+### Onboarding a manufacturer, from the portal
+
+1. **Organizations → Add manufacturer.** Name and contact; it starts pending.
+2. **Approve.** A manufacturer with no active activation key is given one here,
+   and the trust manifest is republished so the app trusts it. Approval and key
+   are one transaction: either both happen or neither. Refused on an instance
+   whose root key does not exist yet, because `infra/provision-keys.sh` declines
+   to run once any key exists.
+3. **Staff access → Add staff member.** The role list follows the organization
+   type. A temporary password is shown to the administrator once; it opens
+   nothing but the password change, so it stops being useful to them the moment
+   the owner signs in.
+4. **Revoke** when someone leaves, with a reason; **Restore** undoes a mistake.
+   Both are audited. An administrator cannot revoke their own access.
+
 ## Manufacturer workspace
 
 | Feature | Required fields / behavior |
@@ -44,6 +59,25 @@ compulsory, removal is an administrator action instead.
 | Activation | Release manager approves **only** QC-passed, covered, unexpired units; signed credential created **before** each unit becomes active |
 | Recall / block | Recall a batch or block units, with reason, effective timestamp, contact instructions |
 | Results and reports | Own verification totals, repeat events, investigation cases. **No access to other manufacturers.** |
+
+### The batch page: one step at a time
+
+The batch page opens on the step with the earliest outstanding work — labels,
+printing, QC and coating, activation — and shows only that step; the others,
+the unit list and the recall are a click away. A release manager with units
+ready lands on activation. The batch list and overview show each batch's stage
+and flag those waiting on the person looking, so a batch ready for release is
+visible to a release manager without anyone telling them.
+
+Readiness is shown to every manufacturer role; only the button is restricted.
+Activation runs are loaded from the server, so a run's failures and "retry only
+the failures" survive a reload.
+
+Every irreversible action asks first, in a dialog that states what it will
+touch: recording a step (how many units), activating (eligible and ineligible
+counts with reasons), recall, blocking, reconciling (counts bounded by the
+run). QC rejection is its own section, by printed reference; rejecting a whole
+batch needs its number typed back, and the API refuses it otherwise.
 
 ### The manufacturing-readiness screen needs care
 

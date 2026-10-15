@@ -44,14 +44,29 @@ class ConfirmationSerializer(serializers.Serializer):
     unit_ids = serializers.ListField(
         child=serializers.UUIDField(), required=False, min_length=1, max_length=5000
     )
+    #: The references printed beside each code, which is what someone holding
+    #: a rejected strip can read. Resolved within ``batch`` only.
+    external_references = serializers.ListField(
+        child=serializers.CharField(max_length=120),
+        required=False,
+        min_length=1,
+        max_length=5000,
+    )
     step = serializers.ChoiceField(choices=[c[0] for c in ManufacturingStep.choices])
     completed_at = serializers.DateTimeField()
     source_reference = serializers.CharField(max_length=300)
     reason = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+    #: Rejecting a whole batch voids every unit in it, irreversibly. The caller
+    #: repeats the batch number to show that is what was meant.
+    confirm_batch_number = serializers.CharField(max_length=100, required=False)
 
     def validate(self, attrs):
         if not attrs.get("batch") and not attrs.get("unit_ids"):
             raise serializers.ValidationError("give either batch or unit_ids")
+        if attrs.get("external_references") and not attrs.get("batch"):
+            raise serializers.ValidationError("external_references need a batch")
+        if attrs["step"] == ManufacturingStep.QC_REJECTED and not attrs.get("reason", "").strip():
+            raise serializers.ValidationError({"reason": "A rejection needs a reason."})
         return attrs
 
 
@@ -77,8 +92,43 @@ def manufacturing_confirmations(request):
         queryset = PackageUnit.objects.select_related(
             "batch__product__manufacturer"
         ).filter(batch=batch)
+        whole_batch = not data.get("unit_ids") and not data.get("external_references")
+        if (
+            whole_batch
+            and data["step"] == ManufacturingStep.QC_REJECTED
+            and data.get("confirm_batch_number", "").strip() != batch.batch_number
+        ):
+            return Response(
+                {
+                    "code": "CONFIRMATION_REQUIRED",
+                    "detail": (
+                        "Rejecting a whole batch voids every unit in it. Repeat "
+                        "the batch number to confirm."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if data.get("unit_ids"):
             queryset = queryset.filter(pk__in=data["unit_ids"])
+        if data.get("external_references"):
+            wanted = {ref.strip() for ref in data["external_references"] if ref.strip()}
+            queryset = queryset.filter(external_reference__in=wanted)
+            found = set(queryset.values_list("external_reference", flat=True))
+            unknown = sorted(wanted - found)
+            if unknown:
+                # Nothing is recorded: a typo in one reference should not leave
+                # the rest half-rejected while the operator works out which.
+                return Response(
+                    {
+                        "code": "UNKNOWN_REFERENCES",
+                        "detail": (
+                            f"{len(unknown)} reference(s) are not units of this "
+                            "batch. Nothing was recorded."
+                        ),
+                        "unknown": unknown[:50],
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         units = list(queryset.order_by("external_reference"))
         if not units:
             return Response(
